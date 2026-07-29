@@ -1,50 +1,58 @@
-# Welcome to your Expo app 👋
+# Nutrition Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A small offline mobile app for recording meals and tracking daily calories.
+It is a learning project built with React Native and Expo, focused on clean local state,
+simple navigation, and persistent on-device storage.
 
-## Get started
+## Features
 
-1. Install dependencies
+- Add a meal name and calorie value for the current day.
+- Validate required fields and positive calorie values.
+- View the daily calorie total.
+- Remove an individual meal entry.
+- Keep separate records by date.
+- Browse saved days and their total calories.
+- Display a basic daily statistics screen.
 
-   ```bash
-   npm install
-   ```
+## Privacy
 
-2. Start the app
+The app stores meal records locally with AsyncStorage. It has no user account, no backend,
+and no cloud synchronization in the current version.
 
-   ```bash
-   npx expo start
-   ```
+This project is a personal tracker prototype, not medical or nutritional advice.
 
-In the output, you'll find options to open the app in a
+## Technology
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- React Native
+- Expo and Expo Router
+- TypeScript
+- React Navigation
+- AsyncStorage
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Run locally
 
-## Get a fresh project
-
-When you're ready, run:
+Requirements: Node.js and a supported Expo environment.
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+From the Expo developer tools, open the app in Expo Go, an Android emulator, an iOS simulator,
+or a web browser when available.
 
-## Learn more
+## Quality check
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run lint
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Current status
 
-## Join the community
+The core daily tracking, history, and local persistence flow works. Planned improvements include
+weekly/monthly charts, stronger UI consistency, and broader language support.
 
-Join our community of developers creating universal apps.
+## Repository purpose
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This is a public learning project. It demonstrates mobile UI structure, local persistence,
+TypeScript models, and small-feature delivery rather than a production health product.
