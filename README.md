@@ -49,8 +49,9 @@ npm run lint
 
 ## Current status
 
-The core daily tracking, history, and local persistence flow works. Planned improvements include
-weekly/monthly charts, stronger UI consistency, and broader language support.
+The current prototype includes daily tracking, history, and local persistence. Russian and Finnish
+interface strings are present; planned improvements include English localization, weekly/monthly
+charts, and stronger UI consistency.
 
 ## Repository purpose
 
