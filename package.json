@@ -1,7 +1,7 @@
 {
   "name": "nutrition-app-expo",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -11,11 +11,12 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "web:build": "expo export --platform web --output-dir dist",
+    "web:build": "expo export --clear --platform web --output-dir dist && node scripts/build-pwa.mjs dist",
     "doctor": "expo-doctor",
     "validate": "npm run lint && npm run typecheck && npm test && npm run web:build",
     "web:serve": "node scripts/serve-web.mjs",
-    "test:db": "jest -c jest.db.config.js --runInBand"
+    "test:db": "jest -c jest.db.config.js --runInBand",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -26,6 +27,7 @@
     "expo-audio": "~57.0.5",
     "expo-constants": "~57.0.21",
     "expo-crypto": "~57.0.3",
+    "expo-dev-client": "~57.0.19",
     "expo-document-picker": "~57.0.3",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
@@ -64,6 +66,7 @@
     "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
     "pg": "^8.23.1",
+    "pngjs": "^7.0.0",
     "typescript": "~6.0.3"
   },
   "private": true,

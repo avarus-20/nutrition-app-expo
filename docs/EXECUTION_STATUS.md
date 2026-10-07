@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 13 — PWA and deployment** (next)
+**Stage 14 — Production hardening** (next)
 
 ## Stages
 
@@ -28,7 +28,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 10 — Photographs
 - [x] Stage 11 — Voice notes
 - [x] Stage 12 — Backup / restore / export
-- [ ] Stage 13 — PWA and deployment
+- [x] Stage 13 — PWA and deployment
 - [ ] Stage 14 — Production hardening
 - [ ] Final audit and cyclic validation
 - [ ] Final PR
@@ -49,6 +49,8 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 13. Deleted media objects are removed from Storage by the client after the deletion is pushed (best effort).
 14. Voice text is turned into entries by a deterministic local parser (`phraseParser` + `foodMatcher`) rather than a second AI call, so it works offline and never invents nutrition values.
 15. Backups are versioned JSON without media binaries, fully validated before writing and merged per record by `updated_at` (docs/DATA_MODEL.md); restored changes are synchronized through the outbox.
+16. Web hosting headers (COOP/COEP, CSP, caching) have one source (`scripts/web-headers.mjs`); the service worker precaches the app shell and activates updates only after the user accepts. `web:build` always clears the Metro cache because `EXPO_PUBLIC_*` changes are not detected by the transform cache.
+17. Three environments (development / preview / production) with separate bundle ids, EAS profiles/environments and Supabase projects.
 8. Account deletion and AI calls run in Supabase Edge Functions; the client only holds the publishable key.
 
 ## Latest validation results
@@ -61,6 +63,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
 | Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
 | Stage 4 PostgreSQL 16 tests (`npm run test:db`, 20) | pass |
+| Stage 13 lint / typecheck / jest (190) / web build with PWA checks / expo-doctor 21/21 / `deno test` (3) / app config per variant; browser E2E at 1280 px and 390 px: service worker controls the page, manifest served, offline cold start (cross-origin isolated, data visible), offline deep link, update prompt → reload → old caches removed; all Stage 8–12 browser suites re-run under the production CSP with no errors | all pass |
 | Stage 12 lint / typecheck / jest (190) / web build; browser E2E at 1280 px and 390 px: seed → JSON + CSV download → restore into a fresh browser profile (3 new) → restore again (3 unchanged) → foreign file and newer-version file rejected with messages → dashboard shows restored entry | all pass |
 | Stage 11 lint / typecheck / jest (181) / web build / `deno check` of each Edge Function; browser E2E with Chrome's fake microphone at 1280 px and 390 px: record → playback position → typed text → draft → confirm → meal editor list → delete; signed-in: fake `transcribe` → draft → confirm → `audio/webm` upload | all pass |
 | Stage 10 lint / typecheck / jest (165) / web build / `deno check` of Edge Functions; browser E2E at 1280 px and 390 px: local-only photo attach/remove/replace/reload persistence/dashboard indicator; signed-in flow against an intercepted Supabase API: photo estimate → draft review (unknown calories blocked) → confirm → binary upload then metadata push | all pass |
@@ -74,6 +77,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 See `docs/AUDIT_BASELINE.md`. Additionally:
 
 - AI Edge Functions have no per-user rate limit yet (provider-side limits apply).
+- Web build is served from the domain root only (no sub-path hosting).
 - A failed best-effort removal of a deleted media object leaves an unreferenced object until account deletion.
 
 ## Known external blockers

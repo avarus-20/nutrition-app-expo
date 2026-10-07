@@ -373,6 +373,11 @@ export const fi: Messages = {
     wrongVersion: 'Varmuuskopio on tehty uudemmalla sovellusversiolla ({version}). Päivitä sovellus ensin.',
     working: 'Käsitellään…',
   },
+  pwa: {
+    updateAvailable: 'Sovelluksesta on saatavilla uusi versio.',
+    reload: 'Päivitä',
+    later: 'Myöhemmin',
+  },
   errors: {
     database: 'Paikalliseen tietokantaan ei päästy.',
     migration: 'Tietojen päivitys epäonnistui. Aiemmat tiedot ovat tallessa.',

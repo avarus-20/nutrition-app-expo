@@ -369,6 +369,11 @@ export const en = {
     wrongVersion: 'This backup was created by a newer app version ({version}). Update the app first.',
     working: 'Working…',
   },
+  pwa: {
+    updateAvailable: 'A new version of the app is available.',
+    reload: 'Reload',
+    later: 'Later',
+  },
   errors: {
     database: 'Could not access the local database.',
     migration: 'Could not upgrade your data. Your previous data is still safe.',

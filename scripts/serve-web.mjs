@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * Serves the production web build (`dist/`) locally with the headers the app
- * needs: cross-origin isolation for expo-sqlite (SharedArrayBuffer) and an
- * SPA fallback to index.html. Usage: npm run web:serve [-- --port 8080]
+ * Serves the production web build (`dist/`) locally with the same headers as
+ * the hosting configs (scripts/web-headers.mjs) and an SPA fallback to
+ * index.html. Usage: npm run web:serve [-- --port 8080] [-- --dir dist]
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 
-const root = resolve(process.argv.includes('--dir') ? process.argv[process.argv.indexOf('--dir') + 1] : 'dist');
-const port = Number(process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : 8080);
+import { IMMUTABLE_PREFIXES, NO_CACHE_PATHS, SECURITY_HEADERS } from './web-headers.mjs';
+
+const arg = (name, fallback) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : fallback);
+const root = resolve(arg('--dir', 'dist'));
+const port = Number(arg('--port', 8080));
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -36,12 +39,17 @@ createServer((req, res) => {
     const asHtml = `${file}.html`;
     file = existsSync(asHtml) ? asHtml : join(root, 'index.html');
   }
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
   res.setHeader('Content-Type', TYPES[extname(file)] ?? 'application/octet-stream');
-  res.setHeader('Cache-Control', file.endsWith('index.html') || file.endsWith('sw.js') ? 'no-cache' : 'public, max-age=3600');
+  const path = `/${file.slice(root.length + 1)}`;
+  res.setHeader(
+    'Cache-Control',
+    NO_CACHE_PATHS.includes(path)
+      ? 'no-cache'
+      : IMMUTABLE_PREFIXES.some((p) => path.startsWith(p))
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=3600',
+  );
   createReadStream(file).pipe(res);
 }).listen(port, () => {
   console.log(`Serving ${root} on http://localhost:${port}`);

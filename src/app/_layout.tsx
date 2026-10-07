@@ -1,11 +1,13 @@
 import { getLocales } from 'expo-localization';
 import { Stack } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/auth/AuthProvider';
 import { createTranslator, errorText, localeTag, resolveLanguage } from '@/i18n';
+import { registerServiceWorker } from '@/pwa/serviceWorker';
+import { UpdatePrompt } from '@/pwa/UpdatePrompt';
 import { PreferencesProvider, useTheme } from '@/providers/PreferencesProvider';
 import { ServicesProvider, useBoot } from '@/providers/ServicesProvider';
 import { SyncProvider } from '@/sync/SyncProvider';
@@ -55,6 +57,7 @@ function AppStack() {
 
 export default function RootLayout() {
   const [boot, retry] = useBoot();
+  useEffect(registerServiceWorker, []);
 
   return (
     <SafeAreaProvider>
@@ -69,6 +72,7 @@ export default function RootLayout() {
               <SyncProvider>
                 <ToastProvider>
                   <AppStack />
+                  <UpdatePrompt />
                 </ToastProvider>
               </SyncProvider>
             </AuthProvider>

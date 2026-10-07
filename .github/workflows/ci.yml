@@ -26,6 +26,22 @@ jobs:
       - run: npm run web:build
       - run: npx expo-doctor
 
+  edge-functions:
+    name: Edge Functions (deno check + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check each function
+        run: |
+          for f in supabase/functions/*/index.ts; do
+            echo "deno check $f"
+            deno check "$f"
+          done
+      - run: deno test supabase/functions/
+
   database:
     name: PostgreSQL migrations, constraints and RLS
     runs-on: ubuntu-latest
