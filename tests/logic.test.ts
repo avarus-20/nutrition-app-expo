@@ -1,4 +1,4 @@
-import { dayKey, sumCalories } from '../lib/logic';
+import { dayKey, sumCalories } from '../src/lib/logic';
 
 describe('legacy logic', () => {
   it('sums calories ignoring non-finite values', () => {
