@@ -44,3 +44,7 @@ app-example
 !.env.example
 coverage/
 deno.lock
+
+# Playwright
+test-results/
+playwright-report/

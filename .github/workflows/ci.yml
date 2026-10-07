@@ -26,6 +26,25 @@ jobs:
       - run: npm run web:build
       - run: npx expo-doctor
 
+  e2e:
+    name: Browser E2E (production web build, desktop + mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run web:build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
+
   edge-functions:
     name: Edge Functions (deno check + test)
     runs-on: ubuntu-latest

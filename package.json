@@ -16,7 +16,8 @@
     "validate": "npm run lint && npm run typecheck && npm test && npm run web:build",
     "web:serve": "node scripts/serve-web.mjs",
     "test:db": "jest -c jest.db.config.js --runInBand",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -53,7 +54,9 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@babel/core": "^7.29.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/react-native": "^14.0.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/jest": "^29.5.14",
