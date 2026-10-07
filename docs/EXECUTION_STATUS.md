@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 12 — Backup / restore / export** (next)
+**Stage 13 — PWA and deployment** (next)
 
 ## Stages
 
@@ -27,7 +27,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 9 — History, statistics, weight, water
 - [x] Stage 10 — Photographs
 - [x] Stage 11 — Voice notes
-- [ ] Stage 12 — Backup / restore / export
+- [x] Stage 12 — Backup / restore / export
 - [ ] Stage 13 — PWA and deployment
 - [ ] Stage 14 — Production hardening
 - [ ] Final audit and cyclic validation
@@ -48,6 +48,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 12. AI recognition (photo estimate, speech-to-text) runs in Edge Functions with an OpenAI-compatible provider; results are stored as device-local drafts (`entry_drafts`, SQLite v2) and are never logged without user confirmation.
 13. Deleted media objects are removed from Storage by the client after the deletion is pushed (best effort).
 14. Voice text is turned into entries by a deterministic local parser (`phraseParser` + `foodMatcher`) rather than a second AI call, so it works offline and never invents nutrition values.
+15. Backups are versioned JSON without media binaries, fully validated before writing and merged per record by `updated_at` (docs/DATA_MODEL.md); restored changes are synchronized through the outbox.
 8. Account deletion and AI calls run in Supabase Edge Functions; the client only holds the publishable key.
 
 ## Latest validation results
@@ -60,6 +61,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
 | Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
 | Stage 4 PostgreSQL 16 tests (`npm run test:db`, 20) | pass |
+| Stage 12 lint / typecheck / jest (190) / web build; browser E2E at 1280 px and 390 px: seed → JSON + CSV download → restore into a fresh browser profile (3 new) → restore again (3 unchanged) → foreign file and newer-version file rejected with messages → dashboard shows restored entry | all pass |
 | Stage 11 lint / typecheck / jest (181) / web build / `deno check` of each Edge Function; browser E2E with Chrome's fake microphone at 1280 px and 390 px: record → playback position → typed text → draft → confirm → meal editor list → delete; signed-in: fake `transcribe` → draft → confirm → `audio/webm` upload | all pass |
 | Stage 10 lint / typecheck / jest (165) / web build / `deno check` of Edge Functions; browser E2E at 1280 px and 390 px: local-only photo attach/remove/replace/reload persistence/dashboard indicator; signed-in flow against an intercepted Supabase API: photo estimate → draft review (unknown calories blocked) → confirm → binary upload then metadata push | all pass |
 | Stage 9 lint / typecheck / jest (130) / web build; browser E2E: history month/week/day, stats 7d + custom range, weight add/trend, water presets, no console errors at 1280 px and 390 px | all pass |

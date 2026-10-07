@@ -364,7 +364,7 @@ export const en = {
     exportCsvHint: 'One row per food entry, for spreadsheets.',
     exported: 'Export ready',
     restoreResult: 'Restored: {inserted} new, {updated} updated, {skipped} unchanged.',
-    restoreConfirm: 'Restore {count} records from this backup?',
+    restoreConfirm: plural({ one: 'Restore {count} record from this backup?', other: 'Restore {count} records from this backup?' }),
     invalidFile: 'This file is not a valid Nutrition Tracker backup.',
     wrongVersion: 'This backup was created by a newer app version ({version}). Update the app first.',
     working: 'Working…',

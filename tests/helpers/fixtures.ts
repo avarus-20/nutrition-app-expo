@@ -1,6 +1,7 @@
 import { migrate } from '@/database/migrations';
 import type { SqlDatabase } from '@/database/types';
 import type { MealItemInput } from '@/domain/validation';
+import { BackupService } from '@/services/backupService';
 import { FoodService } from '@/services/foodService';
 import { GoalService, WaterService, WeightService } from '@/services/bodyService';
 import { DraftService } from '@/services/draftService';
@@ -24,6 +25,7 @@ export function servicesFor(db: SqlDatabase, owner: { id: string } = { id: 'loca
     photos: new PhotoService(db, o, files),
     voice: new VoiceService(db, o, files),
     drafts: new DraftService(db, o, meals),
+    backup: new BackupService(db, o, 'test'),
     files,
     foods: new FoodService(db, o),
     goals: new GoalService(db, o),

@@ -1,5 +1,6 @@
 import type { SqlDatabase } from '@/database/types';
 import * as localFiles from '@/media/localFiles';
+import { BackupService } from './backupService';
 import { GoalService, WaterService, WeightService } from './bodyService';
 import { DraftService } from './draftService';
 import { FoodService } from './foodService';
@@ -21,10 +22,16 @@ export interface Services {
   photos: PhotoService;
   voice: VoiceService;
   drafts: DraftService;
+  backup: BackupService;
   files: MediaFileStore;
 }
 
-export function createServices(db: SqlDatabase, owner: OwnerProvider, files: MediaFileStore = localFiles): Services {
+export function createServices(
+  db: SqlDatabase,
+  owner: OwnerProvider,
+  files: MediaFileStore = localFiles,
+  appVersion: string | null = null,
+): Services {
   const meals = new MealService(db, owner);
   return {
     db,
@@ -38,6 +45,7 @@ export function createServices(db: SqlDatabase, owner: OwnerProvider, files: Med
     photos: new PhotoService(db, owner, files),
     voice: new VoiceService(db, owner, files),
     drafts: new DraftService(db, owner, meals),
+    backup: new BackupService(db, owner, appVersion),
     files,
   };
 }

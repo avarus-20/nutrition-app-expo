@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 import { getDatabase } from '@/database/client';
@@ -17,7 +18,7 @@ const ServicesContext = createContext<Services | null>(null);
 
 async function boot(): Promise<Extract<BootState, { status: 'ready' }>> {
   const db = await getDatabase();
-  const services = createServices(db, ownerStore.get);
+  const services = createServices(db, ownerStore.get, undefined, Constants.expoConfig?.version ?? null);
   let legacyMigrationError: AppError | null = null;
   try {
     await migrateLegacyAsyncStorage(db, ownerStore.get());

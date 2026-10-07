@@ -365,7 +365,10 @@ export const fi: Messages = {
     exportCsvHint: 'Yksi rivi merkintää kohden taulukkolaskentaan.',
     exported: 'Vienti valmis',
     restoreResult: 'Palautettu: {inserted} uutta, {updated} päivitetty, {skipped} ennallaan.',
-    restoreConfirm: 'Palautetaanko {count} tietuetta tästä varmuuskopiosta?',
+    restoreConfirm: plural({
+      one: 'Palautetaanko {count} tietue tästä varmuuskopiosta?',
+      other: 'Palautetaanko {count} tietuetta tästä varmuuskopiosta?',
+    }),
     invalidFile: 'Tiedosto ei ole kelvollinen Ravintopäiväkirjan varmuuskopio.',
     wrongVersion: 'Varmuuskopio on tehty uudemmalla sovellusversiolla ({version}). Päivitä sovellus ensin.',
     working: 'Käsitellään…',
