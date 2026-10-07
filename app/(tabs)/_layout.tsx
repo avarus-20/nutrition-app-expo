@@ -1,6 +1,6 @@
 // app/(tabs)/_layout.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-router/js-tabs';
 import React from 'react';
 import { useT } from '../../lib/i18n';
 

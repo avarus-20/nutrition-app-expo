@@ -37,3 +37,9 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# build output / secrets
+.env
+.env.*
+!.env.example
+coverage/

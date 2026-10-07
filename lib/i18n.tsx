@@ -39,7 +39,7 @@ const STRINGS = {
   },
 } as const;
 
-type Dict = typeof STRINGS['ru'];
+type Dict = Record<keyof (typeof STRINGS)['ru'], string>;
 
 const I18nCtx = createContext<{
   t: Dict;

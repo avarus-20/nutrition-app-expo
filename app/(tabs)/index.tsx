@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, View, Text, TextInput, Button, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import uuid from 'react-native-uuid';
+import { randomUUID } from 'expo-crypto';
 import type { Meal } from '../../types/meal';
 import { loadMealsForDay, saveMealsForDay } from '../../lib/storage';
 import { sumCalories, todayISO } from '../../lib/logic';
@@ -23,7 +23,7 @@ export default function TodayScreen() {
       Alert.alert('Проверьте данные', 'Название и положительные калории обязательны.');
       return;
     }
-    const item: Meal = { id: String(uuid.v4()), title: title.trim(), calories: Math.round(c), createdAt: iso };
+    const item: Meal = { id: randomUUID(), title: title.trim(), calories: Math.round(c), createdAt: iso };
     const next = [item, ...meals];
     setMeals(next);
     await saveMealsForDay(iso, next);
