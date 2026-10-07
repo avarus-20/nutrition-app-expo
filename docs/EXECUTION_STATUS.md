@@ -76,7 +76,6 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 See `docs/AUDIT_BASELINE.md`. Additionally:
 
-- AI Edge Functions have no per-user rate limit yet (provider-side limits apply).
 - Web build is served from the domain root only (no sub-path hosting).
 - A failed best-effort removal of a deleted media object leaves an unreferenced object until account deletion.
 

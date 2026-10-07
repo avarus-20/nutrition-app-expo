@@ -9,7 +9,8 @@
 //   AI_API_KEY     required, OpenAI-compatible API key
 //   AI_BASE_URL    optional, default https://api.openai.com/v1
 //   AI_STT_MODEL   optional, default whisper-1
-import { appLanguage, checkBase64, cors, json, requireUser } from '../_shared/http.ts';
+//   AI_STT_LIMIT_PER_HOUR  optional per-user quota, default 60
+import { appLanguage, checkBase64, consumeQuota, cors, json, quotaResponse, requireUser } from '../_shared/http.ts';
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const TYPES: Record<string, string> = {
@@ -55,6 +56,9 @@ Deno.serve(async (req) => {
   if (!ext) return json(400, { error: 'unsupported_type' });
   const payloadError = checkBase64(body.audioBase64, MAX_AUDIO_BYTES);
   if (payloadError) return json(payloadError === 'payload_too_large' ? 413 : 400, { error: payloadError });
+
+  const quota = await consumeQuota(userId, 'transcribe');
+  if (quota !== 'ok') return quotaResponse(quota);
 
   const language = appLanguage(body.locale);
   const form = new FormData();

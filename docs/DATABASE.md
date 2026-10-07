@@ -124,6 +124,7 @@ Every synchronized table additionally has `user_id`, `created_at`, `updated_at`,
 | `voice_notes` | yes | audio metadata + optional transcript; binary in Storage. |
 | `weight_entries` | yes | `measured_at`, `weight_kg`, notes. |
 | `water_entries` | yes | `consumed_at`, `local_date`, `amount_ml`. |
+| `ai_usage` | no (server only) | hourly request counters per user and AI function, written only by `consume_ai_quota()` (service role, called from the Edge Functions); rows older than a day are pruned. |
 
 Local-only tables (SQLite): `app_meta` (preferences, sync cursors, migration reports), `sync_outbox`,
 `schema_migrations`. Local-only columns on media tables: `local_uri`, `upload_status`, `upload_attempts`,
@@ -174,7 +175,7 @@ Local-only tables (SQLite): `app_meta` (preferences, sync cursors, migration rep
 
 RLS is enabled **and forced** on every table in `public`. Synchronized tables: `select/insert/update` only
 where `user_id = auth.uid()`; no DELETE policy (clients soft-delete). `anon` has no privileges at all.
-Profiles/settings: owner may read and update only whitelisted columns. Storage: see [SECURITY.md](SECURITY.md).
+Profiles/settings: owner may read and update only whitelisted columns. `ai_usage` has RLS enabled without any policy and no privileges for `anon`/`authenticated`; only the `SECURITY DEFINER` function `consume_ai_quota` (executable by `service_role` only) touches it. Storage: see [SECURITY.md](SECURITY.md).
 
 ## Migration strategy
 

@@ -40,6 +40,7 @@ export function SegmentedControl<T extends string>({
             onPress={() => onChange(o.value)}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={o.label}
             style={(state) => {
               const s = state as { focused?: boolean };

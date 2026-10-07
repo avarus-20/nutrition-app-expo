@@ -39,3 +39,47 @@ export function appLanguage(locale: unknown): 'en' | 'ru' | 'fi' {
   if (l.startsWith('fi')) return 'fi';
   return 'en';
 }
+
+export type QuotaFunction = 'estimate-photo' | 'transcribe';
+
+const QUOTA_DEFAULTS: Record<QuotaFunction, { env: string; perHour: number }> = {
+  'estimate-photo': { env: 'AI_PHOTO_LIMIT_PER_HOUR', perHour: 30 },
+  transcribe: { env: 'AI_STT_LIMIT_PER_HOUR', perHour: 60 },
+};
+
+export function quotaLimit(fn: QuotaFunction, raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : QUOTA_DEFAULTS[fn].perHour;
+}
+
+/**
+ * Counts one request against the user's hourly quota (migration
+ * 20261007000004_ai_rate_limit.sql). Fails closed: if the quota cannot be
+ * checked, the provider is not called.
+ */
+export async function consumeQuota(userId: string, fn: QuotaFunction): Promise<'ok' | 'exceeded' | 'unavailable'> {
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false },
+  });
+  const { data, error } = await admin.rpc('consume_ai_quota', {
+    p_user_id: userId,
+    p_function: fn,
+    p_limit: quotaLimit(fn, Deno.env.get(QUOTA_DEFAULTS[fn].env)),
+    p_window_seconds: 3600,
+  });
+  if (error) {
+    console.error(`${fn} quota check failed`, error.message);
+    return 'unavailable';
+  }
+  return data === true ? 'ok' : 'exceeded';
+}
+
+/** Response for a quota outcome other than 'ok'. */
+export function quotaResponse(outcome: 'exceeded' | 'unavailable'): Response {
+  return outcome === 'exceeded'
+    ? new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+        headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '3600' },
+      })
+    : json(503, { error: 'quota_unavailable' });
+}

@@ -63,7 +63,8 @@ export async function classifyFunctionError(error: unknown): Promise<AppError> {
     if (status === 400 || status === 413 || status === 422) {
       return new AppError('validation', code ?? 'Rejected input', { cause: error });
     }
-    if (status === 429 || status >= 500) return new AppError('network', code ?? `HTTP ${status}`, { cause: error });
+    if (status === 429) return new AppError('rate_limited', code ?? 'HTTP 429', { cause: error });
+    if (status >= 500) return new AppError('network', code ?? `HTTP ${status}`, { cause: error });
     return new AppError('unknown', code ?? `HTTP ${status}`, { cause: error });
   }
   return toAppError(error, 'unknown');

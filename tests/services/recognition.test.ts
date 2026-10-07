@@ -15,7 +15,7 @@ describe('classifyFunctionError', () => {
     [httpError(503, { error: 'not_configured' }), 'not_configured'],
     [httpError(413, { error: 'payload_too_large' }), 'validation'],
     [httpError(400, { error: 'unsupported_type' }), 'validation'],
-    [httpError(429, {}), 'network'],
+    [httpError(429, { error: 'rate_limited' }), 'rate_limited'],
     [httpError(502, { error: 'provider_error' }), 'network'],
     [httpError(418, null), 'unknown'],
     [new Error('fetch failed'), 'network'],

@@ -9,7 +9,8 @@
 //   AI_API_KEY        required, OpenAI-compatible API key
 //   AI_BASE_URL       optional, default https://api.openai.com/v1
 //   AI_VISION_MODEL   optional, default gpt-4o-mini
-import { appLanguage, checkBase64, cors, json, requireUser } from '../_shared/http.ts';
+//   AI_PHOTO_LIMIT_PER_HOUR  optional per-user quota, default 30
+import { appLanguage, checkBase64, consumeQuota, cors, json, quotaResponse, requireUser } from '../_shared/http.ts';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -69,6 +70,9 @@ Deno.serve(async (req) => {
   if (typeof body.mimeType !== 'string' || !MIME_TYPES.has(body.mimeType)) return json(400, { error: 'unsupported_type' });
   const payloadError = checkBase64(body.imageBase64, MAX_IMAGE_BYTES);
   if (payloadError) return json(payloadError === 'payload_too_large' ? 413 : 400, { error: payloadError });
+
+  const quota = await consumeQuota(userId, 'estimate-photo');
+  if (quota !== 'ok') return quotaResponse(quota);
 
   const model = Deno.env.get('AI_VISION_MODEL') ?? 'gpt-4o-mini';
   const baseUrl = (Deno.env.get('AI_BASE_URL') ?? 'https://api.openai.com/v1').replace(/\/$/, '');

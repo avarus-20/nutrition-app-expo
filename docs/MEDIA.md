@@ -109,6 +109,7 @@ Without an account (or without `AI_API_KEY`) the text field is still available, 
 | `AI_BASE_URL` | default `https://api.openai.com/v1` |
 | `AI_VISION_MODEL` | default `gpt-4o-mini` |
 | `AI_STT_MODEL` | default `whisper-1` (voice notes) |
+| `AI_PHOTO_LIMIT_PER_HOUR` / `AI_STT_LIMIT_PER_HOUR` | per-user hourly quotas, default 30 / 60; above them the functions answer `429 rate_limited` (shown as "Too many requests") without calling the provider |
 | `MEDIA_BUCKET` | default `user-media` |
 
 ## Tests

@@ -20,7 +20,7 @@ Nothing in this repository deploys automatically. Hosting, Supabase projects, EA
 | --- | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or legacy `EXPO_PUBLIC_SUPABASE_ANON_KEY`), `EXPO_PUBLIC_SUPABASE_MEDIA_BUCKET` | `.env` locally; EAS environment variables (development / preview / production); web host build env | yes — inlined into the bundle; protected by RLS |
 | `APP_VARIANT`, `EAS_PROJECT_ID` | `eas.json` profiles / EAS env / `.env` | yes |
-| `AI_API_KEY`, `AI_BASE_URL`, `AI_VISION_MODEL`, `AI_STT_MODEL`, `MEDIA_BUCKET` | Supabase Edge Function secrets (`supabase secrets set`) | **no — server only** |
+| `AI_API_KEY`, `AI_BASE_URL`, `AI_VISION_MODEL`, `AI_STT_MODEL`, `AI_PHOTO_LIMIT_PER_HOUR`, `AI_STT_LIMIT_PER_HOUR`, `MEDIA_BUCKET` | Supabase Edge Function secrets (`supabase secrets set`) | **no — server only** |
 | `SUPABASE_SERVICE_ROLE_KEY` | injected by Supabase into Edge Functions | **no — never in the app, never in `.env` of the app** |
 | Supabase DB password, access tokens, Apple/Google credentials | the maintainer's machine / EAS credentials service | **no** |
 
@@ -64,7 +64,7 @@ Dashboard settings that are not in migrations:
 
 ### Migrations
 
-- Files: `supabase/migrations/<timestamp>_<name>.sql` — schema (`…01`), RLS (`…02`), private storage (`…03`).
+- Files: `supabase/migrations/<timestamp>_<name>.sql` — schema (`…01`), RLS (`…02`), private storage (`…03`), AI request quota (`…04`).
 - Always test first: `npm run test:db` runs them against a throwaway PostgreSQL database (with `supabase/tests/supabase_shim.sql` standing in for Supabase's `auth`/`storage` schemas) and checks constraints, sync triggers and RLS. CI runs the same job.
 - Order of rollout: development → preview → production, each with `supabase db push` after `supabase link` to that project. Take a backup (Dashboard → Database → Backups, or `supabase db dump`) before pushing to production.
 - Migrations are forward-only and must stay compatible with the previous app version (old clients keep syncing until users update): add columns as nullable or with defaults, never rename/drop in the same release. See [DATABASE.md](DATABASE.md#migration-strategy).

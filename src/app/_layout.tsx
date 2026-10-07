@@ -1,5 +1,5 @@
 import { getLocales } from 'expo-localization';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,9 +13,11 @@ import { ServicesProvider, useBoot } from '@/providers/ServicesProvider';
 import { SyncProvider } from '@/sync/SyncProvider';
 import { darkColors, lightColors } from '@/theme/tokens';
 import { ToastProvider } from '@/ui/Toast';
+import { toAppError } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 /** Shown before preferences are available, so it uses the system language and scheme. */
-function BootScreen({ error, onRetry }: { error?: { code: string }; onRetry?: () => void }) {
+function BootScreen({ error, onRetry, crashed }: { error?: { code: string }; onRetry?: () => void; crashed?: boolean }) {
   const colors = useColorScheme() === 'dark' ? darkColors : lightColors;
   const system = getLocales().map((l) => ({ languageCode: l.languageCode, languageTag: l.languageTag }));
   const language = resolveLanguage('system', system);
@@ -27,7 +29,7 @@ function BootScreen({ error, onRetry }: { error?: { code: string }; onRetry?: ()
       {error ? (
         <>
           <Text accessibilityRole="header" style={{ color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' }}>
-            {m.errors.bootTitle}
+            {crashed ? m.errors.crashTitle : m.errors.bootTitle}
           </Text>
           <Text style={{ color: colors.textMuted, textAlign: 'center' }}>{errorText(m, error.code)}</Text>
           <Pressable
@@ -53,6 +55,12 @@ function AppStack() {
       <Stack.Screen name="add" options={{ presentation: 'modal' }} />
     </Stack>
   );
+}
+
+/** Last-resort screen for render errors anywhere in the app. Local data is unaffected. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  logger.error('ui', 'unhandled render error', error);
+  return <BootScreen crashed error={{ code: toAppError(error).code }} onRetry={() => void retry()} />;
 }
 
 export default function RootLayout() {

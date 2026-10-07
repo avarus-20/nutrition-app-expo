@@ -19,6 +19,7 @@ export type AppErrorCode =
   | 'invalid_import'
   | 'unsupported_version'
   | 'not_configured'
+  | 'rate_limited'
   | 'not_found'
   | 'unsupported_platform'
   | 'unknown';

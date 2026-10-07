@@ -144,7 +144,7 @@ export function DateField({
         variant="secondary"
         icon="calendar-outline"
         label={i18n.date(value, 'medium')}
-        accessibilityLabel={`${label}: ${i18n.date(value, 'long')}`}
+        accessibilityLabel={`${label}: ${i18n.date(value, 'medium')}`}
         onPress={() => {
           setMonth(value);
           setOpen(true);

@@ -39,6 +39,7 @@ function NavigationBar({ state, descriptors, navigation }: BottomTabBarProps) {
         onPress={onPress}
         accessibilityRole="tab"
         accessibilityState={{ selected: focused }}
+        aria-selected={focused}
         accessibilityLabel={title}
         testID={`tab-${route.name}`}
         style={(s) => {
@@ -68,7 +69,6 @@ function NavigationBar({ state, descriptors, navigation }: BottomTabBarProps) {
   if (isDesktop) {
     return (
       <View
-        accessibilityRole="tablist"
         style={[
           styles.sidebar,
           { backgroundColor: colors.surface, borderRightColor: colors.border, padding: spacing.lg, paddingTop: insets.top + spacing.xl },
@@ -80,7 +80,9 @@ function NavigationBar({ state, descriptors, navigation }: BottomTabBarProps) {
             {m.nav.appName}
           </AppText>
         </View>
-        <View style={{ gap: spacing.xs }}>{items}</View>
+        <View accessibilityRole="tablist" style={{ gap: spacing.xs }}>
+          {items}
+        </View>
         <View style={{ flex: 1 }} />
         <SyncBadge showLabel />
       </View>

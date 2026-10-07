@@ -253,3 +253,33 @@ describe('storage policies', () => {
     expect(bobDelete.rowCount).toBe(0);
   });
 });
+
+describe('AI quota', () => {
+  const consume = (c: Client, user: string, limit = 2) =>
+    c.query<{ ok: boolean }>("SELECT public.consume_ai_quota($1, 'transcribe', $2, 3600) AS ok", [user, limit]);
+
+  it('is not reachable with a user session', async () => {
+    await expect(asUser(client, alice, (c) => consume(c, alice))).rejects.toThrow(/permission denied/);
+    await expect(asUser(client, alice, (c) => c.query('SELECT * FROM public.ai_usage'))).rejects.toThrow(
+      /permission denied/,
+    );
+  });
+
+  it('counts requests per user and function within the window', async () => {
+    await client.query('BEGIN');
+    try {
+      await client.query('SET LOCAL ROLE service_role');
+      const results = [];
+      for (let i = 0; i < 3; i++) results.push((await consume(client, alice)).rows[0]!.ok);
+      expect(results).toEqual([true, true, false]);
+      expect((await consume(client, bob)).rows[0]!.ok).toBe(true);
+      const other = await client.query<{ ok: boolean }>(
+        "SELECT public.consume_ai_quota($1, 'estimate-photo', 2, 3600) AS ok",
+        [alice],
+      );
+      expect(other.rows[0]!.ok).toBe(true);
+    } finally {
+      await client.query('ROLLBACK');
+    }
+  });
+});
