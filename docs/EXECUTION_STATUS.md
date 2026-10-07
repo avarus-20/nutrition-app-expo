@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 4 — PostgreSQL / Supabase** (next)
+**Stage 7 — Responsive UI, i18n, themes** (next)
 
 ## Stages
 
@@ -19,9 +19,9 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 1 — Platform modernization and CI
 - [x] Stage 2 — Production architecture
 - [x] Stage 3 — SQLite and legacy migration
-- [ ] Stage 4 — PostgreSQL / Supabase
-- [ ] Stage 5 — Authentication
-- [ ] Stage 6 — Offline synchronization
+- [x] Stage 4 — PostgreSQL / Supabase
+- [x] Stage 5 — Authentication
+- [x] Stage 6 — Offline synchronization
 - [ ] Stage 7 — Responsive UI, i18n, themes
 - [ ] Stage 8 — Complete nutrition domain
 - [ ] Stage 9 — History, statistics, weight, water
@@ -39,6 +39,10 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 2. Offline-first: every write goes to SQLite (`expo-sqlite`) first; sync is a background concern.
 3. Supabase (PostgreSQL + Auth + Storage + Edge Functions) is the backend. App is fully usable without an account.
 4. Client-generated UUID primary keys make every push an idempotent upsert.
+5. Conflict policy: record-level last-write-wins on client `updated_at`, enforced by the server trigger `tg_sync_row` (docs/OFFLINE_SYNC.md).
+6. Data owner model: rows created before sign-in belong to `local` and are claimed (re-owned + queued) at sign-in.
+7. Web media is stored as data URIs in SQLite (no durable browser file system with stable URIs); native media in the document directory.
+8. Account deletion and AI calls run in Supabase Edge Functions; the client only holds the publishable key.
 
 ## Latest validation results
 
@@ -49,6 +53,8 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | baseline expo-doctor | fail (2 checks) |
 | Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
 | Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
+| Stage 4 PostgreSQL 16 tests (`npm run test:db`, 20) | pass |
+| Stage 6 lint / typecheck / jest (95) / web build / expo-doctor 21/21 / test:db (20) | all pass |
 
 ## Known technical debt
 
@@ -62,11 +68,11 @@ None yet.
 
 - SQLite schema v1 (`src/database/migrations.ts`) — implemented and tested.
 - Legacy AsyncStorage import (`src/services/legacyMigration.ts`) — implemented, idempotent, verified in Node tests and in a real browser (web build).
-- PostgreSQL migrations — pending (Stage 4).
+- PostgreSQL migrations — `supabase/migrations/2026100700000{1,2,3}_*.sql` (schema, RLS, private storage). Verified against PostgreSQL 16 locally and in CI (`database` job) with a Supabase shim (`supabase/tests/supabase_shim.sql`). Not applied to any hosted project (no credentials available — see DEPLOYMENT.md).
 
 ## Synchronization implementation status
 
-Not started.
+Implemented (`src/sync/`): outbox push with batching/isolation/backoff, media upload-before-metadata, keyset pull with overlap, LWW reconciliation, orphan parking, purge, Supabase gateway, provider triggers (sign-in, reconnect, foreground, debounced writes, interval, manual). Tested against an in-memory server with real SQLite. Not exercised against a hosted Supabase project (no credentials).
 
 ## Latest important commit
 

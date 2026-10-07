@@ -4,6 +4,7 @@ import { ActivityIndicator, Button, Text, View } from 'react-native';
 import { AuthProvider } from '@/auth/AuthProvider';
 import { I18nProvider } from '@/lib/i18n';
 import { ServicesProvider, useBoot } from '@/providers/ServicesProvider';
+import { SyncProvider } from '@/sync/SyncProvider';
 
 export default function RootLayout() {
   const [boot, retry] = useBoot();
@@ -26,9 +27,11 @@ export default function RootLayout() {
   return (
     <ServicesProvider services={boot.services}>
       <AuthProvider>
-        <I18nProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-        </I18nProvider>
+        <SyncProvider>
+          <I18nProvider>
+            <Stack screenOptions={{ headerShown: false }} />
+          </I18nProvider>
+        </SyncProvider>
       </AuthProvider>
     </ServicesProvider>
   );
