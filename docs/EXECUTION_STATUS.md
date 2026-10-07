@@ -11,14 +11,14 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 1 — Platform modernization and CI** (next)
+**Stage 4 — PostgreSQL / Supabase** (next)
 
 ## Stages
 
 - [x] Stage 0 — Audit and baseline (`docs/AUDIT_BASELINE.md`)
-- [ ] Stage 1 — Platform modernization and CI
-- [ ] Stage 2 — Production architecture
-- [ ] Stage 3 — SQLite and legacy migration
+- [x] Stage 1 — Platform modernization and CI
+- [x] Stage 2 — Production architecture
+- [x] Stage 3 — SQLite and legacy migration
 - [ ] Stage 4 — PostgreSQL / Supabase
 - [ ] Stage 5 — Authentication
 - [ ] Stage 6 — Offline synchronization
@@ -47,6 +47,8 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | baseline lint | pass |
 | baseline typecheck | fail (7 errors, see audit) |
 | baseline expo-doctor | fail (2 checks) |
+| Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
+| Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
 
 ## Known technical debt
 
@@ -58,7 +60,9 @@ None yet.
 
 ## Database migration status
 
-Not started.
+- SQLite schema v1 (`src/database/migrations.ts`) — implemented and tested.
+- Legacy AsyncStorage import (`src/services/legacyMigration.ts`) — implemented, idempotent, verified in Node tests and in a real browser (web build).
+- PostgreSQL migrations — pending (Stage 4).
 
 ## Synchronization implementation status
 

@@ -1,39 +1,32 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, View, Text, TextInput, Button, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { randomUUID } from 'expo-crypto';
-import type { Meal } from '../../types/meal';
-import { loadMealsForDay, saveMealsForDay } from '../../lib/storage';
-import { sumCalories, todayISO } from '../../lib/logic';
+import React, { useMemo, useState } from 'react';
+import { Alert, Button, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, Text, TextInput, View } from 'react-native';
+
+import { sumCalories } from '@/domain/nutrition';
+import { parseDecimal } from '@/domain/validation';
+import { useQuery } from '@/hooks/useQuery';
+import { useServices } from '@/providers/ServicesProvider';
+import { todayLocalDate } from '@/utils/dates';
 
 export default function TodayScreen() {
-  const [meals, setMeals] = useState<Meal[]>([]);
+  const { meals } = useServices();
   const [title, setTitle] = useState('');
   const [cal, setCal] = useState('');
-
-  const iso = useMemo(() => todayISO(), []);
-  const total = useMemo(() => sumCalories(meals), [meals]);
-
-  useEffect(() => {
-    loadMealsForDay(iso).then(setMeals).catch(console.error);
-  }, [iso]);
+  const iso = useMemo(() => todayLocalDate(), []);
+  const day = useQuery(() => meals.getDay(iso), [iso], ['meals', 'meal_items']);
+  const items = useMemo(() => (day.data ?? []).flatMap((m) => m.items).reverse(), [day.data]);
+  const total = sumCalories(items);
 
   const addMeal = async () => {
-    const c = Number(cal);
-    if (!title.trim() || !Number.isFinite(c) || c <= 0) {
+    const c = parseDecimal(cal);
+    if (!title.trim() || c === null || !Number.isFinite(c) || c <= 0) {
       Alert.alert('Проверьте данные', 'Название и положительные калории обязательны.');
       return;
     }
-    const item: Meal = { id: randomUUID(), title: title.trim(), calories: Math.round(c), createdAt: iso };
-    const next = [item, ...meals];
-    setMeals(next);
-    await saveMealsForDay(iso, next);
-    setTitle(''); setCal('');
-  };
-
-  const removeMeal = async (id: string) => {
-    const next = meals.filter(m => m.id !== id);
-    setMeals(next);
-    await saveMealsForDay(iso, next);
+    await meals.addItemsToDay({ date: iso, mealType: 'snack' }, [
+      { food_name: title.trim(), food_id: null, quantity: 1, unit: 'serving', calories: Math.round(c), protein_g: null, carbs_g: null, fat_g: null, fiber_g: null, sugar_g: null, salt_g: null },
+    ]);
+    setTitle('');
+    setCal('');
   };
 
   return (
@@ -43,18 +36,17 @@ export default function TodayScreen() {
         <TextInput placeholder="Блюдо" value={title} onChangeText={setTitle} style={{ borderWidth: 1, borderRadius: 10, padding: 10 }} />
         <TextInput placeholder="Калории" keyboardType="numeric" value={cal} onChangeText={setCal} style={{ borderWidth: 1, borderRadius: 10, padding: 10 }} />
         <Button title="Добавить" onPress={addMeal} />
-        <View style={{ height: 12 }} />
         <FlatList
-          data={meals}
+          data={items}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ gap: 8 }}
           renderItem={({ item }) => (
             <View style={{ borderWidth: 1, borderRadius: 10, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.title}</Text>
+                <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.food_name}</Text>
                 <Text style={{ color: '#555' }}>{item.calories} ккал</Text>
               </View>
-              <Button title="Удалить" color="#b00020" onPress={() => removeMeal(item.id)} />
+              <Button title="Удалить" color="#b00020" onPress={() => meals.deleteItem(item.id)} />
             </View>
           )}
           ListEmptyComponent={<Text style={{ color: '#777' }}>Пока пусто. Добавьте первый приём пищи 👇</Text>}
