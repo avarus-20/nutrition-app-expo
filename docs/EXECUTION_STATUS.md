@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 14 — Production hardening** (next)
+**Final audit and cyclic validation** (Stages 0–14 complete)
 
 ## Stages
 
@@ -29,7 +29,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 11 — Voice notes
 - [x] Stage 12 — Backup / restore / export
 - [x] Stage 13 — PWA and deployment
-- [ ] Stage 14 — Production hardening
+- [x] Stage 14 — Production hardening
 - [ ] Final audit and cyclic validation
 - [ ] Final PR
 
@@ -52,6 +52,9 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 16. Web hosting headers (COOP/COEP, CSP, caching) have one source (`scripts/web-headers.mjs`); the service worker precaches the app shell and activates updates only after the user accepts. `web:build` always clears the Metro cache because `EXPO_PUBLIC_*` changes are not detected by the transform cache.
 17. Three environments (development / preview / production) with separate bundle ids, EAS profiles/environments and Supabase projects.
 8. Account deletion and AI calls run in Supabase Edge Functions; the client only holds the publishable key.
+18. AI Edge Functions enforce a per-user fixed-window quota (`consume_ai_quota`, service-role only) and fail closed (503) if the quota cannot be checked.
+19. A root error boundary (`ErrorBoundary` export in `src/app/_layout.tsx`) shows a localized crash screen with retry instead of a blank app.
+20. Browser E2E (Playwright, Chrome, desktop 1280 px + mobile 390 px) runs against the production web build served with production headers; any console error fails a test; axe checks WCAG 2.1 AA on all main routes.
 
 ## Latest validation results
 
@@ -63,6 +66,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
 | Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
 | Stage 4 PostgreSQL 16 tests (`npm run test:db`, 20) | pass |
+| Stage 14 lint / typecheck / jest (194 incl. UI render tests) / test:db (22) / `deno test` (4) + `deno check` of 3 functions / web build with PWA checks / expo-doctor 21/21 / Playwright E2E 16/16 (diary, media, backup, PWA offline + update, axe WCAG 2.1 AA: 0 violations on 11 routes, light + dark) | all pass |
 | Stage 13 lint / typecheck / jest (190) / web build with PWA checks / expo-doctor 21/21 / `deno test` (3) / app config per variant; browser E2E at 1280 px and 390 px: service worker controls the page, manifest served, offline cold start (cross-origin isolated, data visible), offline deep link, update prompt → reload → old caches removed; all Stage 8–12 browser suites re-run under the production CSP with no errors | all pass |
 | Stage 12 lint / typecheck / jest (190) / web build; browser E2E at 1280 px and 390 px: seed → JSON + CSV download → restore into a fresh browser profile (3 new) → restore again (3 unchanged) → foreign file and newer-version file rejected with messages → dashboard shows restored entry | all pass |
 | Stage 11 lint / typecheck / jest (181) / web build / `deno check` of each Edge Function; browser E2E with Chrome's fake microphone at 1280 px and 390 px: record → playback position → typed text → draft → confirm → meal editor list → delete; signed-in: fake `transcribe` → draft → confirm → `audio/webm` upload | all pass |
@@ -87,7 +91,7 @@ None yet.
 
 - SQLite schema v2 (`src/database/migrations.ts`; v2 adds the local `entry_drafts` table) — implemented and tested.
 - Legacy AsyncStorage import (`src/services/legacyMigration.ts`) — implemented, idempotent, verified in Node tests and in a real browser (web build).
-- PostgreSQL migrations — `supabase/migrations/2026100700000{1,2,3}_*.sql` (schema, RLS, private storage). Verified against PostgreSQL 16 locally and in CI (`database` job) with a Supabase shim (`supabase/tests/supabase_shim.sql`). Not applied to any hosted project (no credentials available — see DEPLOYMENT.md).
+- PostgreSQL migrations — `supabase/migrations/2026100700000{1,2,3,4}_*.sql` (schema, RLS, private storage, AI rate limit). Verified against PostgreSQL 16 locally and in CI (`database` job) with a Supabase shim (`supabase/tests/supabase_shim.sql`). Not applied to any hosted project (no credentials available — see DEPLOYMENT.md).
 
 ## Synchronization implementation status
 
