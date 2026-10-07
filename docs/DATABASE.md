@@ -196,6 +196,11 @@ Profiles/settings: owner may read and update only whitelisted columns. Storage: 
 * Destructive changes (drop/rename column) must use the copy-table pattern inside the migration and be
   covered by a test that migrates a populated database.
 
+| Version | Name | Content |
+| --- | --- | --- |
+| 1 | `initial_schema` | synchronized tables (mirroring PostgreSQL), `app_meta`, `sync_outbox` |
+| 2 | `entry_drafts` | device-local review queue for photo / voice recognition results (not synchronized, see docs/MEDIA.md) |
+
 ### Legacy AsyncStorage import (prototype data)
 
 The prototype stored `meals_YYYY-MM-DD` → JSON array of `{ id, title, calories, createdAt }`.

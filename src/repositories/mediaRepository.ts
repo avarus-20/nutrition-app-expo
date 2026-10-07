@@ -43,6 +43,21 @@ export const mediaRepository = {
     );
   },
 
+  /** Photo and voice note counts per meal of one day. */
+  async countsForDay(
+    db: SqlExecutor,
+    ownerId: string,
+    date: string,
+  ): Promise<{ meal_id: string; photos: number; voice: number }[]> {
+    return db.all(
+      `SELECT m.id AS meal_id,
+         (SELECT COUNT(*) FROM media_files f WHERE f.meal_id = m.id AND f.deleted_at IS NULL) AS photos,
+         (SELECT COUNT(*) FROM voice_notes v WHERE v.meal_id = m.id AND v.deleted_at IS NULL) AS voice
+       FROM meals m WHERE m.user_id = ? AND m.local_date = ? AND m.deleted_at IS NULL`,
+      [ownerId, date],
+    );
+  },
+
   async counts(db: SqlExecutor, ownerId: string): Promise<{ pending: number; failed: number }> {
     const row = await db.first<{ pending: number; failed: number }>(
       `SELECT

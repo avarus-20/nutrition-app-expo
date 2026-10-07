@@ -1,8 +1,10 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Switch, View } from 'react-native';
 
 import { MEAL_TYPES, type MealType, type Unit } from '@/domain/types';
+import { estimatePhotoToDraft, useRecognition } from '@/features/drafts/recognition';
+import { CaptureButtons, PhotoImage } from '@/features/photos/PhotoViews';
 import { errorText } from '@/i18n';
 import { useQuery } from '@/hooks/useQuery';
 import { inputNumber, NutritionFields } from '@/features/nutrition/NutritionFields';
@@ -11,11 +13,12 @@ import { nutritionToText, parseNutrition, parsePositive, type NutritionText } fr
 import { mealTypeForTime, MealTypePicker, UnitPicker } from '@/features/nutrition/pickers';
 import { useI18n, useTheme } from '@/providers/PreferencesProvider';
 import { useServices } from '@/providers/ServicesProvider';
+import type { PreparedPhoto } from '@/services/photoService';
 import { Button, IconButton } from '@/ui/Button';
 import { DateField } from '@/ui/Calendar';
 import { SegmentedControl } from '@/ui/Controls';
 import { goBack, Screen } from '@/ui/Screen';
-import { Card, Divider, EmptyState, ErrorState, ListRow, LoadingState } from '@/ui/Surfaces';
+import { Banner, Card, Divider, EmptyState, ErrorState, ListRow, LoadingState } from '@/ui/Surfaces';
 import { AppText } from '@/ui/Text';
 import { NumberField, TextField } from '@/ui/TextField';
 import { useToast } from '@/ui/Toast';
@@ -264,6 +267,71 @@ function ManualTab({ target, onDone }: { target: AddTarget; onDone: () => void }
   );
 }
 
+function PhotoTab({ target, onDone }: { target: AddTarget; onDone: () => void }) {
+  const services = useServices();
+  const i18n = useI18n();
+  const { m } = i18n;
+  const { spacing } = useTheme();
+  const toast = useToast();
+  const recognition = useRecognition();
+  const [saved, setSaved] = useState<{ mealId: string; photoId: string } | null>(null);
+  const [busy, setBusy] = useState<'save' | 'estimate' | null>(null);
+  const photo = useQuery(() => (saved ? services.photos.get(saved.photoId) : Promise.resolve(null)), [saved?.photoId], ['media_files']);
+  const mealTarget = { date: target.date, mealType: target.mealType, mealId: saved?.mealId ?? target.mealId };
+
+  const attach = async (prepared: PreparedPhoto) => {
+    setBusy('save');
+    try {
+      const mealId = saved?.mealId ?? (await services.meals.ensureMeal(target));
+      const photoId = await services.photos.add(mealId, prepared);
+      setSaved({ mealId, photoId });
+      toast.show(m.photos.attached);
+    } catch (error) {
+      toast.show(errorText(m, toAppError(error).code), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const estimate = async () => {
+    if (!saved) return;
+    setBusy('estimate');
+    try {
+      const draftId = await estimatePhotoToDraft(services, recognition, saved.photoId, mealTarget, i18n.locale);
+      router.replace(`/drafts/${draftId}`);
+    } catch (error) {
+      const e = toAppError(error);
+      toast.show(e.code === 'validation' ? m.photos.nothingRecognized : errorText(m, e.code), 'error');
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <AppText tone="muted">{m.photos.attachHint}</AppText>
+      {photo.data ? <PhotoImage photo={photo.data} height={300} contentFit="contain" /> : null}
+      <CaptureButtons onCaptured={attach} busy={busy !== null} />
+      {saved ? (
+        <>
+          <Banner tone="info" message={recognition ? m.photos.estimateDisclaimer : m.photos.estimateUnavailable} />
+          <Button
+            icon="sparkles-outline"
+            label={busy === 'estimate' ? m.photos.estimating : m.photos.estimate}
+            onPress={estimate}
+            loading={busy === 'estimate'}
+            disabled={!recognition || busy === 'save'}
+            testID="photo-estimate"
+          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            <Button variant="secondary" icon="restaurant-outline" label={m.photos.openMeal} onPress={() => router.replace(`/meal/${saved.mealId}`)} />
+            <Button variant="ghost" label={m.common.done} onPress={onDone} testID="photo-done" />
+          </View>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
 export function AddFoodScreen() {
   const params = useLocalSearchParams<{ date?: string; meal?: string; mealId?: string; tab?: string }>();
   const { m } = useI18n();
@@ -274,6 +342,7 @@ export function AddFoodScreen() {
   const tabs: { value: AddTab; label: string }[] = [
     { value: 'search', label: m.add.tabSearch },
     { value: 'manual', label: m.add.tabManual },
+    { value: 'photo', label: m.add.tabPhoto },
   ];
   const [tab, setTab] = useState<AddTab>(tabs.some((x) => x.value === params.tab) ? (params.tab as AddTab) : 'search');
 
@@ -295,6 +364,7 @@ export function AddFoodScreen() {
       <SegmentedControl label={m.add.title} options={tabs} value={tab} onChange={setTab} testID="add-tabs" />
       {tab === 'search' ? <SearchTab target={target} onDone={onDone} /> : null}
       {tab === 'manual' ? <ManualTab target={target} onDone={onDone} /> : null}
+      {tab === 'photo' ? <PhotoTab key={`${target.date}:${target.mealType}`} target={target} onDone={onDone} /> : null}
     </Screen>
   );
 }

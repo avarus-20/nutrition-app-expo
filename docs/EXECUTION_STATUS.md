@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Stage 10 — Photographs** (next)
+**Stage 11 — Voice notes** (next)
 
 ## Stages
 
@@ -25,7 +25,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 7 — Responsive UI, i18n, themes
 - [x] Stage 8 — Complete nutrition domain
 - [x] Stage 9 — History, statistics, weight, water
-- [ ] Stage 10 — Photographs
+- [x] Stage 10 — Photographs
 - [ ] Stage 11 — Voice notes
 - [ ] Stage 12 — Backup / restore / export
 - [ ] Stage 13 — PWA and deployment
@@ -45,6 +45,8 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 9. i18n: typed dictionaries (`src/i18n/en.ts` is the type source; RU/FI must match at compile time), Intl plural rules and formatting, language persisted in SQLite preferences; legacy `app_lang` adopted on first start.
 10. Responsive shell: JS tabs with a custom tab bar — bottom bar < 1000 px, sidebar ≥ 1000 px; content max width 1180 px.
 11. Statistics are aggregated in SQL (`mealRepository.rangeSummary`); trend = least-squares slope over logged days; weight trend = 7-entry moving average.
+12. AI recognition (photo estimate, speech-to-text) runs in Edge Functions with an OpenAI-compatible provider; results are stored as device-local drafts (`entry_drafts`, SQLite v2) and are never logged without user confirmation.
+13. Deleted media objects are removed from Storage by the client after the deletion is pushed (best effort).
 8. Account deletion and AI calls run in Supabase Edge Functions; the client only holds the publishable key.
 
 ## Latest validation results
@@ -57,6 +59,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 | Stage 3 lint / typecheck / jest (56) / web build / expo-doctor | all pass |
 | Stage 3 browser smoke (web SQLite + OPFS persistence + legacy import) | pass |
 | Stage 4 PostgreSQL 16 tests (`npm run test:db`, 20) | pass |
+| Stage 10 lint / typecheck / jest (165) / web build / `deno check` of Edge Functions; browser E2E at 1280 px and 390 px: local-only photo attach/remove/replace/reload persistence/dashboard indicator; signed-in flow against an intercepted Supabase API: photo estimate → draft review (unknown calories blocked) → confirm → binary upload then metadata push | all pass |
 | Stage 9 lint / typecheck / jest (130) / web build; browser E2E: history month/week/day, stats 7d + custom range, weight add/trend, water presets, no console errors at 1280 px and 390 px | all pass |
 | Stage 8 lint / typecheck / jest (122) / web build; browser E2E at 1280 px and 390 px: goals, manual add (+save as food), add from saved food with scaling, item edit with auto-scaling and move to another meal, delete, favorites, day navigation, reload persistence | all pass |
 | Stage 7 lint / typecheck / jest (110) / web build; browser check of sidebar (1280px), bottom tabs (390px), RU switch persisted across reload, dark theme | all pass |
@@ -64,7 +67,10 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Known technical debt
 
-See `docs/AUDIT_BASELINE.md`.
+See `docs/AUDIT_BASELINE.md`. Additionally:
+
+- AI Edge Functions have no per-user rate limit yet (provider-side limits apply).
+- A failed best-effort removal of a deleted media object leaves an unreferenced object until account deletion.
 
 ## Known external blockers
 
@@ -72,7 +78,7 @@ None yet.
 
 ## Database migration status
 
-- SQLite schema v1 (`src/database/migrations.ts`) — implemented and tested.
+- SQLite schema v2 (`src/database/migrations.ts`; v2 adds the local `entry_drafts` table) — implemented and tested.
 - Legacy AsyncStorage import (`src/services/legacyMigration.ts`) — implemented, idempotent, verified in Node tests and in a real browser (web build).
 - PostgreSQL migrations — `supabase/migrations/2026100700000{1,2,3}_*.sql` (schema, RLS, private storage). Verified against PostgreSQL 16 locally and in CI (`database` job) with a Supabase shim (`supabase/tests/supabase_shim.sql`). Not applied to any hosted project (no credentials available — see DEPLOYMENT.md).
 

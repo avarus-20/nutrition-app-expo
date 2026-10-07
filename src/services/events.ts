@@ -1,6 +1,9 @@
 import type { EntityName } from '@/database/schema';
 
-type Listener = (entities: readonly EntityName[]) => void;
+/** Synchronized tables plus device-local tables the UI observes. */
+export type DataTopic = EntityName | 'entry_drafts';
+
+type Listener = (topics: readonly DataTopic[]) => void;
 
 /** Notifies UI hooks that local data changed (local writes or sync pulls). */
 class DataEvents {
@@ -13,10 +16,10 @@ class DataEvents {
     };
   }
 
-  emit(entities: readonly EntityName[]): void {
+  emit(topics: readonly DataTopic[]): void {
     for (const l of [...this.listeners]) {
       try {
-        l(entities);
+        l(topics);
       } catch {
         // A failing listener must not break the writer.
       }

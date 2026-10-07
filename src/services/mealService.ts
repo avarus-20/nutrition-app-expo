@@ -8,6 +8,7 @@ import {
 } from '@/domain/validation';
 import { baseRow, insertEntity, softDeleteEntity, updateEntity } from '@/repositories/base';
 import { mealRepository } from '@/repositories/mealRepository';
+import { mediaRepository } from '@/repositories/mediaRepository';
 import { localDateTimeToIso, type LocalDate } from '@/utils/dates';
 import { AppError } from '@/utils/errors';
 import { newId } from '@/utils/ids';
@@ -15,6 +16,13 @@ import { dataEvents } from './events';
 import { validate } from './validate';
 
 export type OwnerProvider = () => string;
+
+/** A meal identified by id, or by (day, type) when `mealId` is absent. */
+export interface MealTarget {
+  date: LocalDate;
+  mealType: MealType;
+  mealId?: string | null;
+}
 
 const DEFAULT_TIMES: Record<MealType, string> = {
   breakfast: '08:00',
@@ -55,6 +63,12 @@ export class MealService {
 
   daysWithData(limit: number, offset: number) {
     return mealRepository.daysWithData(this.db, this.owner(), limit, offset);
+  }
+
+  /** Attachment counts per meal of the day (dashboard indicators). */
+  async mediaCounts(date: LocalDate): Promise<Map<string, { photos: number; voice: number }>> {
+    const rows = await mediaRepository.countsForDay(this.db, this.owner(), date);
+    return new Map(rows.map((r) => [r.meal_id, { photos: r.photos, voice: r.voice }]));
   }
 
   recentItems(limit = 20) {
@@ -100,7 +114,7 @@ export class MealService {
    * meal if needed. All items are written in one transaction.
    */
   async addItemsToDay(
-    target: { date: LocalDate; mealType: MealType; mealId?: string | null },
+    target: MealTarget,
     items: (MealItemInput & { source?: MealItemSource })[],
     source: MealItemSource = 'manual',
   ): Promise<string> {
@@ -108,34 +122,44 @@ export class MealService {
     const validItems = items.map((i) => ({ input: validate(mealItemInputSchema, i), source: i.source ?? source }));
     const owner = this.owner();
     const mealId = await this.db.transaction(async (tx) => {
-      let id = target.mealId ?? null;
-      if (id) {
-        const existing = await tx.first<{ id: string }>(
-          'SELECT id FROM meals WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
-          [id, owner],
-        );
-        if (!existing) throw new AppError('not_found', 'Meal not found');
-      } else {
-        const existing = await mealRepository.findMealByType(tx, owner, target.date, target.mealType);
-        id =
-          existing?.id ??
-          (await this.insertMeal(
-            tx,
-            owner,
-            validate(mealInputSchema, {
-              local_date: target.date,
-              eaten_at: defaultEatenAt(target.date, target.mealType),
-              meal_type: target.mealType,
-              title: null,
-              notes: null,
-            }),
-          ));
-      }
+      const id = await this.resolveMeal(tx, owner, target);
       for (const [i, item] of validItems.entries()) await this.insertItem(tx, owner, id, item.input, item.source, i);
       return id;
     });
     dataEvents.emit(['meals', 'meal_items']);
     return mealId;
+  }
+
+  /** Returns the target meal, creating an empty one of that type on that day if needed. */
+  async ensureMeal(target: MealTarget): Promise<string> {
+    const owner = this.owner();
+    const id = await this.db.transaction((tx) => this.resolveMeal(tx, owner, target));
+    dataEvents.emit(['meals']);
+    return id;
+  }
+
+  private async resolveMeal(tx: SqlExecutor, owner: string, target: MealTarget): Promise<string> {
+    if (target.mealId) {
+      const existing = await tx.first<{ id: string }>(
+        'SELECT id FROM meals WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+        [target.mealId, owner],
+      );
+      if (!existing) throw new AppError('not_found', 'Meal not found');
+      return existing.id;
+    }
+    const existing = await mealRepository.findMealByType(tx, owner, target.date, target.mealType);
+    if (existing) return existing.id;
+    return this.insertMeal(
+      tx,
+      owner,
+      validate(mealInputSchema, {
+        local_date: target.date,
+        eaten_at: defaultEatenAt(target.date, target.mealType),
+        meal_type: target.mealType,
+        title: null,
+        notes: null,
+      }),
+    );
   }
 
   async updateMeal(id: string, patch: Partial<MealInput>): Promise<void> {

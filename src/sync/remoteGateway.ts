@@ -32,5 +32,7 @@ export interface RemoteGateway {
   uploadFile(path: string, localUri: string, mimeType: string): Promise<void>;
   /** Downloads a private object of the signed-in user. */
   downloadFile(path: string): Promise<Uint8Array>;
+  /** Removes a private object of the signed-in user (missing objects are not an error). */
+  removeFile(path: string): Promise<void>;
   registerDevice(device: DeviceInfo): Promise<void>;
 }

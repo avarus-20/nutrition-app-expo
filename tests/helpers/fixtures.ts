@@ -3,7 +3,10 @@ import type { SqlDatabase } from '@/database/types';
 import type { MealItemInput } from '@/domain/validation';
 import { FoodService } from '@/services/foodService';
 import { GoalService, WaterService, WeightService } from '@/services/bodyService';
+import { DraftService } from '@/services/draftService';
 import { MealService } from '@/services/mealService';
+import { PhotoService } from '@/services/photoService';
+import { FakeFiles } from './fakeFiles';
 import { createTestDatabase } from './nodeDriver';
 
 export async function setupDb(): Promise<SqlDatabase> {
@@ -12,10 +15,14 @@ export async function setupDb(): Promise<SqlDatabase> {
   return db;
 }
 
-export function servicesFor(db: SqlDatabase, owner: { id: string } = { id: 'local' }) {
+export function servicesFor(db: SqlDatabase, owner: { id: string } = { id: 'local' }, files = new FakeFiles()) {
   const o = () => owner.id;
+  const meals = new MealService(db, o);
   return {
-    meals: new MealService(db, o),
+    meals,
+    photos: new PhotoService(db, o, files),
+    drafts: new DraftService(db, o, meals),
+    files,
     foods: new FoodService(db, o),
     goals: new GoalService(db, o),
     weight: new WeightService(db, o),

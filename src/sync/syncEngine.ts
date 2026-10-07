@@ -314,6 +314,7 @@ export class SyncEngine {
         }
       });
       result.pushed += batch.length;
+      if ((MEDIA_ENTITIES as readonly string[]).includes(entity)) await this.removeDeletedObjects(batch);
     } catch (error) {
       if (isNetwork(error)) throw error;
       if (batch.length > 1) {
@@ -330,6 +331,22 @@ export class SyncEngine {
         'UPDATE sync_outbox SET attempts = attempts + 1, last_error = ?, next_attempt_at = ? WHERE id = ?',
         [message, next, entry.id],
       );
+    }
+  }
+
+  /**
+   * Once a media deletion has reached the server, the binary is removed from
+   * object storage. Best effort: a failure leaves an unreferenced object
+   * (cleaned up with the account) but never blocks synchronization.
+   */
+  private async removeDeletedObjects(batch: { payload: RemoteRow }[]): Promise<void> {
+    for (const { payload } of batch) {
+      if (payload.deleted_at === null || typeof payload.storage_path !== 'string') continue;
+      try {
+        await this.gateway.removeFile(payload.storage_path);
+      } catch (error) {
+        logger.warn('sync', 'could not remove deleted media object', errorMessage(error));
+      }
     }
   }
 

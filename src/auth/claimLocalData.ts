@@ -54,8 +54,10 @@ export async function claimLocalData(db: SqlDatabase, userId: string): Promise<n
       const r = await tx.run(`UPDATE ${entity} SET user_id = ? WHERE user_id = ?`, [userId, LOCAL_OWNER]);
       claimed += r.changes;
     }
+    const drafts = await tx.run('UPDATE entry_drafts SET user_id = ? WHERE user_id = ?', [userId, LOCAL_OWNER]);
+    claimed += drafts.changes;
   });
-  if (claimed > 0) dataEvents.emit(ENTITY_ORDER);
+  if (claimed > 0) dataEvents.emit([...ENTITY_ORDER, 'entry_drafts']);
   return claimed;
 }
 
@@ -92,6 +94,7 @@ export async function wipeAccountData(db: SqlDatabase, userId: string): Promise<
       );
       await tx.run(`DELETE FROM ${entity} WHERE user_id = ?`, [userId]);
     }
+    await tx.run('DELETE FROM entry_drafts WHERE user_id = ?', [userId]);
     await tx.run('DELETE FROM app_meta WHERE substr(key, 1, ?) = ? OR key = ?', [
       syncKeys.prefix(userId).length,
       syncKeys.prefix(userId),

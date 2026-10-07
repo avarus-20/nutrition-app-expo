@@ -393,6 +393,26 @@ describe('SyncEngine media', () => {
     expect(row?.storage_path).toContain(`${USER}/photo/`);
   });
 
+  it('removes the stored object once the deletion of an uploaded photo was pushed', async () => {
+    const a = await device(remote);
+    const mealId = await a.s.meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item()]);
+    const photoId = await addPhoto(a, mealId);
+    await a.engine.sync();
+    const path = `${USER}/photo/${photoId}.jpg`;
+    expect(remote.files.has(path)).toBe(true);
+
+    const ts = new Date(Date.now() + 10).toISOString();
+    await a.db.run('UPDATE media_files SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, photoId]);
+    await a.db.run("INSERT INTO sync_outbox (entity, entity_id, created_at) VALUES ('media_files', ?, ?)", [photoId, ts]);
+    remote.failNext('network');
+    expect((await a.engine.sync()).status).toBe('offline');
+    expect(remote.files.has(path)).toBe(true); // deletion not on the server yet
+
+    expect((await a.engine.sync()).status).toBe('ok');
+    expect(remote.table('media_files').get(photoId)?.deleted_at).not.toBeNull();
+    expect(remote.files.has(path)).toBe(false);
+  });
+
   it('drops a never-uploaded photo deleted before sync without contacting the server', async () => {
     const a = await device(remote);
     const mealId = await a.s.meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item()]);

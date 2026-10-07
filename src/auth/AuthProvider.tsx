@@ -103,7 +103,7 @@ export function AuthProvider({
         for (const uri of files) await deleteLocalFile(uri).catch(() => undefined);
         ownerStore.set(LOCAL_OWNER);
         setState({ status: 'signedOut' });
-        dataEvents.emit(ENTITY_ORDER);
+        dataEvents.emit([...ENTITY_ORDER, 'entry_drafts']);
       },
     }),
     [state, requireGateway, db],

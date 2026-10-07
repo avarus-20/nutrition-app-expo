@@ -139,6 +139,30 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX idx_outbox_due ON sync_outbox (next_attempt_at)`,
     ],
   },
+  {
+    version: 2,
+    name: 'entry_drafts',
+    statements: [
+      // Device-local review queue for automatically recognized entries (photo
+      // estimates, voice transcripts). Never synchronized: nothing becomes a
+      // meal item until the user confirms it.
+      `CREATE TABLE entry_drafts (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('photo_ai', 'voice')),
+        local_date TEXT NOT NULL CHECK (length(local_date) = 10),
+        meal_type TEXT NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
+        meal_id TEXT,
+        media_id TEXT,
+        voice_note_id TEXT,
+        input_text TEXT,
+        items TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX idx_drafts_user ON entry_drafts (user_id, created_at)`,
+    ],
+  },
 ];
 
 export async function getSchemaVersion(db: SqlDatabase): Promise<number> {

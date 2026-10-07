@@ -3,31 +3,18 @@
 // which Supabase injects into Edge Functions; it never reaches the client.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const BUCKET = Deno.env.get('MEDIA_BUCKET') ?? 'user-media';
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { cors, json, requireUser } from '../_shared/http.ts';
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+const BUCKET = Deno.env.get('MEDIA_BUCKET') ?? 'user-media';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' });
 
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return json(401, { error: 'unauthorized' });
+  const userId = await requireUser(req);
+  if (!userId) return json(401, { error: 'unauthorized' });
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const userClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData, error: userError } = await userClient.auth.getUser();
-  if (userError || !userData.user) return json(401, { error: 'unauthorized' });
-  const userId = userData.user.id;
-
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   // Remove every object below <userId>/ (paged listing per folder).

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
@@ -133,7 +134,17 @@ function Stat({
   );
 }
 
-function MealCard({ type, meals, date }: { type: MealType; meals: MealWithItems[]; date: LocalDate }) {
+function MealCard({
+  type,
+  meals,
+  date,
+  media,
+}: {
+  type: MealType;
+  meals: MealWithItems[];
+  date: LocalDate;
+  media?: Map<string, { photos: number; voice: number }>;
+}) {
   const i18n = useI18n();
   const { m, t } = i18n;
   const items = meals.flatMap((meal) => meal.items);
@@ -168,6 +179,7 @@ function MealCard({ type, meals, date }: { type: MealType; meals: MealWithItems[
               </AppText>
             </Pressable>
           ) : null}
+          <MediaIndicator counts={media?.get(meal.id)} />
           {meal.items.map((item) => (
             <ListRow
               key={item.id}
@@ -191,6 +203,24 @@ function MealCard({ type, meals, date }: { type: MealType; meals: MealWithItems[
         </View>
       ))}
     </Card>
+  );
+}
+
+function MediaIndicator({ counts }: { counts?: { photos: number; voice: number } }) {
+  const { m, t } = useI18n();
+  const { colors } = useTheme();
+  if (!counts || counts.photos + counts.voice === 0) return null;
+  const parts: string[] = [];
+  if (counts.photos > 0) parts.push(t(m.photos.count, { count: counts.photos }));
+  if (counts.voice > 0) parts.push(t(m.voice.count, { count: counts.voice }));
+  return (
+    <View style={[styles.cardActions, { gap: 6 }]} accessible accessibilityLabel={parts.join(', ')}>
+      {counts.photos > 0 ? <Ionicons name="camera-outline" size={14} color={colors.textMuted} /> : null}
+      {counts.voice > 0 ? <Ionicons name="mic-outline" size={14} color={colors.textMuted} /> : null}
+      <AppText variant="small" tone="muted">
+        {parts.join(' · ')}
+      </AppText>
+    </View>
   );
 }
 
@@ -235,16 +265,18 @@ export function DayView({ date, onDateChange }: { date: LocalDate; onDateChange:
 
   const day = useQuery(
     async () => {
-      const [meals, goals, water] = await Promise.all([
+      const [meals, goals, water, media] = await Promise.all([
         services.meals.getDay(date),
         services.goals.getGoals(),
         services.water.forDay(date),
+        services.meals.mediaCounts(date),
       ]);
-      return { meals, goals, waterMl: water.reduce((s, w) => s + w.amount_ml, 0) };
+      return { meals, goals, waterMl: water.reduce((s, w) => s + w.amount_ml, 0), media };
     },
     [date],
-    ['meals', 'meal_items', 'nutrition_goals', 'water_entries'],
+    ['meals', 'meal_items', 'nutrition_goals', 'water_entries', 'media_files', 'voice_notes'],
   );
+  const drafts = useQuery(() => services.drafts.count(), [], ['entry_drafts']);
 
   const title =
     date === today
@@ -308,6 +340,13 @@ export function DayView({ date, onDateChange }: { date: LocalDate; onDateChange:
                 {unknownMacros ? ` · ${m.dashboard.unknownMacros}` : ''}
               </AppText>
             ) : null}
+            {drafts.data ? (
+              <Banner
+                tone="warning"
+                message={t(m.drafts.pendingBanner, { count: drafts.data })}
+                action={<Button compact variant="ghost" label={m.drafts.review} onPress={() => router.push('/drafts')} testID="drafts-banner" />}
+              />
+            ) : null}
             {!day.data?.goals.calories ? <Banner message={m.dashboard.noGoal} action={<Button compact variant="ghost" label={m.dashboard.setGoals} onPress={() => router.push('/goals')} />} /> : null}
           </View>
           <View style={{ gap: spacing.lg }}>
@@ -321,7 +360,13 @@ export function DayView({ date, onDateChange }: { date: LocalDate; onDateChange:
               </Card>
             ) : null}
             {MEAL_TYPES.map((type) => (
-              <MealCard key={type} type={type} date={date} meals={meals.filter((meal) => meal.meal_type === type)} />
+              <MealCard
+                key={type}
+                type={type}
+                date={date}
+                meals={meals.filter((meal) => meal.meal_type === type)}
+                media={day.data?.media}
+              />
             ))}
           </View>
         </Columns>

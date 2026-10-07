@@ -135,6 +135,11 @@ export class FakeRemote implements RemoteGateway {
     return new TextEncoder().encode(content);
   }
 
+  async removeFile(path: string): Promise<void> {
+    if (!path.startsWith(`${this.authUser}/`)) throw new AppError('sync', 'row-level security');
+    this.files.delete(path);
+  }
+
   async registerDevice(device: DeviceInfo): Promise<void> {
     this.devices.set(device.id, device);
   }

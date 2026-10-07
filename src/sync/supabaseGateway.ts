@@ -109,6 +109,16 @@ export class SupabaseGateway implements RemoteGateway {
     return new Uint8Array(await response.data.arrayBuffer());
   }
 
+  async removeFile(path: string): Promise<void> {
+    let response;
+    try {
+      response = await this.client.storage.from(this.bucket).remove([path]);
+    } catch (error) {
+      throw classifyRemoteError(error);
+    }
+    if (response.error) throw classifyRemoteError(response.error);
+  }
+
   async registerDevice(device: DeviceInfo): Promise<void> {
     let response;
     try {

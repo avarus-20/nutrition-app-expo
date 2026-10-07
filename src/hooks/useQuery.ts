@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 
-import type { EntityName } from '@/database/schema';
-import { dataEvents } from '@/services/events';
+import { dataEvents, type DataTopic } from '@/services/events';
 import { ownerStore } from '@/services/ownerStore';
 import { toAppError, type AppError } from '@/utils/errors';
 
@@ -33,7 +32,7 @@ function sameDeps(a: readonly unknown[], b: readonly unknown[]): boolean {
 export function useQuery<T>(
   fn: () => Promise<T>,
   deps: readonly unknown[],
-  entities: readonly EntityName[] | 'all' = 'all',
+  entities: readonly DataTopic[] | 'all' = 'all',
 ): QueryState<T> {
   const [settled, setSettled] = useState<Settled<T> | null>(null);
   const [tick, setTick] = useState(0);
