@@ -27,7 +27,9 @@ function clean(value: string | undefined): string | null {
 export const config: AppConfig = {
   variant: readVariant(),
   supabaseUrl: clean(process.env.EXPO_PUBLIC_SUPABASE_URL),
-  supabaseAnonKey: clean(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+  // Either the legacy "anon" key or the newer "publishable" key; both are client-safe.
+  supabaseAnonKey:
+    clean(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ?? clean(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
   mediaBucket: clean(process.env.EXPO_PUBLIC_SUPABASE_MEDIA_BUCKET) ?? 'user-media',
 };
 
