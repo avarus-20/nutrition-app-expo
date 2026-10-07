@@ -29,6 +29,9 @@ jobs:
   edge-functions:
     name: Edge Functions (deno check + test)
     runs-on: ubuntu-latest
+    env:
+      # The functions resolve npm: specifiers themselves; the app's package.json must not apply.
+      DENO_NO_PACKAGE_JSON: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2

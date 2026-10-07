@@ -43,3 +43,4 @@ app-example
 .env.*
 !.env.example
 coverage/
+deno.lock
