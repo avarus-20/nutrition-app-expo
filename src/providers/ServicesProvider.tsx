@@ -2,15 +2,16 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 import { getDatabase } from '@/database/client';
 import { createServices, type Services } from '@/services/container';
-import { migrateLegacyAsyncStorage } from '@/services/legacyMigration';
+import { migrateLegacyAsyncStorage, readLegacyLanguage } from '@/services/legacyMigration';
 import { ownerStore } from '@/services/ownerStore';
+import type { Preferences } from '@/services/settingsService';
 import { AppError, toAppError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 
 export type BootState =
   | { status: 'loading' }
   | { status: 'error'; error: AppError }
-  | { status: 'ready'; services: Services; legacyMigrationError: AppError | null };
+  | { status: 'ready'; services: Services; preferences: Preferences; legacyMigrationError: AppError | null };
 
 const ServicesContext = createContext<Services | null>(null);
 
@@ -25,7 +26,17 @@ async function boot(): Promise<Extract<BootState, { status: 'ready' }>> {
     legacyMigrationError = toAppError(error, 'migration');
     logger.error('boot', 'legacy migration failed', error);
   }
-  return { status: 'ready', services, legacyMigrationError };
+  return { status: 'ready', services, preferences: await loadPreferences(services), legacyMigrationError };
+}
+
+/** On first start the language chosen in the previous app version (`app_lang`) is carried over. */
+async function loadPreferences(services: Services): Promise<Preferences> {
+  if (await services.settings.isInitialized()) return services.settings.load();
+  const prefs = await services.settings.load();
+  const legacy = await readLegacyLanguage();
+  if (legacy === 'ru' || legacy === 'fi') prefs.language = legacy;
+  await services.settings.save(prefs);
+  return prefs;
 }
 
 export function useBoot(): [BootState, () => void] {

@@ -1,3 +1,4 @@
+import { wipeAccountData } from '@/auth/claimLocalData';
 import type { SqlDatabase } from '@/database/types';
 import { baseRow, insertEntity } from '@/repositories/base';
 import { backoffMs, SyncEngine } from '@/sync/syncEngine';
@@ -251,6 +252,38 @@ describe('SyncEngine', () => {
     await a.engine.sync();
     expect(remote.table('meals').size).toBe(0);
     expect(await outboxCount(a.db)).toBe(2);
+  });
+
+  it('keeps sync cursors per account so a second user on the device gets all their data', async () => {
+    const other = await device(remote);
+    remote.authUser = OTHER;
+    other.owner.id = OTHER;
+    await other.s.meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item({ food_name: 'Other' })]);
+    await other.engine.sync();
+
+    remote.authUser = USER;
+    const a = await device(remote);
+    await a.s.meals.addItemsToDay({ date: DAY, mealType: 'dinner' }, [item()]);
+    await a.engine.sync();
+
+    // Same device database: user A signs out, OTHER signs in.
+    a.owner.id = OTHER;
+    remote.authUser = OTHER;
+    await a.engine.sync();
+    const names = await a.db.all<{ food_name: string }>('SELECT food_name FROM meal_items WHERE user_id = ?', [OTHER]);
+    expect(names.map((n) => n.food_name)).toEqual(['Other']);
+  });
+
+  it('wipes only the deleted account from the device', async () => {
+    const a = await device(remote);
+    await a.s.meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item()]);
+    await a.engine.sync();
+    a.owner.id = 'local';
+    await a.s.meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item({ food_name: 'Local' })]);
+    await wipeAccountData(a.db, USER);
+    expect((await a.db.first<{ n: number }>('SELECT COUNT(*) AS n FROM meals WHERE user_id = ?', [USER]))?.n).toBe(0);
+    expect((await a.db.first<{ n: number }>('SELECT COUNT(*) AS n FROM meals WHERE user_id = ?', ['local']))?.n).toBe(1);
+    expect(await a.db.first("SELECT key FROM app_meta WHERE key LIKE 'sync.%'")).toBeNull();
   });
 
   it('keeps a pending local change that is newer than the server copy', async () => {

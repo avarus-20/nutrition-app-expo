@@ -1,21 +1,19 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+
+import { useI18n } from '@/providers/PreferencesProvider';
+import { Button } from '@/ui/Button';
+import { Screen } from '@/ui/Screen';
+import { EmptyState } from '@/ui/Surfaces';
 
 export default function NotFoundScreen() {
+  const { m } = useI18n();
   return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <View style={styles.container}>
-        <Text>This screen does not exist.</Text>
-        <Link href="/" style={styles.link}>
-          Go to home screen
-        </Link>
-      </View>
-    </>
+    <Screen title={m.errors.notFoundTitle}>
+      <EmptyState
+        icon="compass-outline"
+        title={m.errors.notFoundTitle}
+        action={<Button label={m.errors.goHome} onPress={() => router.replace('/')} />}
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  link: { marginTop: 15, paddingVertical: 15 },
-});

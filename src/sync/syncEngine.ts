@@ -54,9 +54,13 @@ interface OutboxEntry {
 /** Server-managed columns are never sent by the client. */
 const SERVER_MANAGED = new Set(['server_updated_at', 'version']);
 
-const CURSOR_KEY = (entity: EntityName) => `sync.cursor.${entity}`;
-const ORPHANS_KEY = (entity: EntityName) => `sync.orphans.${entity}`;
-export const LAST_SYNC_KEY = 'sync.last_success_at';
+/** Sync bookkeeping is per account: several users may sign in on one device. */
+export const syncKeys = {
+  cursor: (userId: string, entity: EntityName) => `sync.${userId}.cursor.${entity}`,
+  orphans: (userId: string, entity: EntityName) => `sync.${userId}.orphans.${entity}`,
+  lastSuccess: (userId: string) => `sync.${userId}.last_success_at`,
+  prefix: (userId: string) => `sync.${userId}.`,
+};
 /** Per account: a device row belongs to exactly one user (RLS). */
 const DEVICE_KEY = (userId: string) => `device.id.${userId}`;
 
@@ -148,7 +152,9 @@ export class SyncEngine {
   }
 
   async lastSyncedAt(): Promise<string | null> {
-    return metaRepository.get(this.db, LAST_SYNC_KEY);
+    const userId = this.options.userId();
+    if (!userId || userId === LOCAL_OWNER) return null;
+    return metaRepository.get(this.db, syncKeys.lastSuccess(userId));
   }
 
   private async runOnce(): Promise<SyncResult> {
@@ -166,7 +172,7 @@ export class SyncEngine {
       for (const uri of files) {
         await this.options.deleteLocalFile?.(uri).catch((e: unknown) => logger.warn('sync', 'file cleanup failed', e));
       }
-      if (result.failed === 0) await metaRepository.set(this.db, LAST_SYNC_KEY, this.now().toISOString());
+      if (result.failed === 0) await metaRepository.set(this.db, syncKeys.lastSuccess(userId), this.now().toISOString());
       else result.status = 'partial';
     } catch (error) {
       if (isNetwork(error)) {
@@ -332,7 +338,7 @@ export class SyncEngine {
   private async pull(userId: string, result: SyncResult, changed: Set<EntityName>): Promise<void> {
     for (const entity of ENTITY_ORDER) {
       await this.retryOrphans(entity, userId, result, changed);
-      const saved = await metaRepository.getJson<PullCursor>(this.db, CURSOR_KEY(entity));
+      const saved = await metaRepository.getJson<PullCursor>(this.db, syncKeys.cursor(userId, entity));
       let cursor: PullCursor | null = saved;
       let after: PullCursor | null = saved
         ? { ts: new Date(new Date(saved.ts).getTime() - this.pullOverlapMs).toISOString(), id: '' }
@@ -345,7 +351,7 @@ export class SyncEngine {
         const last = page[page.length - 1]!;
         after = { ts: String(last.server_updated_at), id: String(last.id) };
         if (!cursor || compareCursor(after, cursor) > 0) cursor = after;
-        await metaRepository.setJson(this.db, CURSOR_KEY(entity), cursor);
+        await metaRepository.setJson(this.db, syncKeys.cursor(userId, entity), cursor);
         if (page.length < this.pullPageSize) break;
       }
     }
@@ -362,7 +368,7 @@ export class SyncEngine {
         else if (outcome === 'invalid') result.errors.push(`invalid ${entity} row ${String(raw.id)}`);
       }
     });
-    if (orphans.length > 0) await this.saveOrphans(entity, orphans);
+    if (orphans.length > 0) await this.saveOrphans(userId, entity, orphans);
     result.pulled += applied;
     return applied;
   }
@@ -428,11 +434,12 @@ export class SyncEngine {
    * device between our meals and meal_items pulls) are parked and retried on
    * the next sync instead of blocking the cursor.
    */
-  private async saveOrphans(entity: EntityName, rows: RemoteRow[]): Promise<void> {
-    const existing = (await metaRepository.getJson<RemoteRow[]>(this.db, ORPHANS_KEY(entity))) ?? [];
+  private async saveOrphans(userId: string, entity: EntityName, rows: RemoteRow[]): Promise<void> {
+    const key = syncKeys.orphans(userId, entity);
+    const existing = (await metaRepository.getJson<RemoteRow[]>(this.db, key)) ?? [];
     const merged = new Map(existing.map((r) => [String(r.id), r]));
     for (const r of rows) merged.set(String(r.id), r);
-    await metaRepository.setJson(this.db, ORPHANS_KEY(entity), [...merged.values()].slice(-2000));
+    await metaRepository.setJson(this.db, key, [...merged.values()].slice(-2000));
   }
 
   private async retryOrphans(
@@ -441,9 +448,10 @@ export class SyncEngine {
     result: SyncResult,
     changed: Set<EntityName>,
   ): Promise<void> {
-    const orphans = await metaRepository.getJson<RemoteRow[]>(this.db, ORPHANS_KEY(entity));
+    const key = syncKeys.orphans(userId, entity);
+    const orphans = await metaRepository.getJson<RemoteRow[]>(this.db, key);
     if (!orphans || orphans.length === 0) return;
-    await metaRepository.remove(this.db, ORPHANS_KEY(entity));
+    await metaRepository.remove(this.db, key);
     const applied = await this.applyPage(entity, userId, orphans, result);
     if (applied > 0) changed.add(entity);
   }

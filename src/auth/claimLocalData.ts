@@ -1,9 +1,10 @@
-import { ENTITY_ORDER } from '@/database/schema';
+import { ENTITY_ORDER, MEDIA_ENTITIES } from '@/database/schema';
 import type { SqlDatabase } from '@/database/types';
 import { GOAL_KEYS, LOCAL_OWNER, type GoalKey, type NutritionGoal } from '@/domain/types';
 import { enqueueChange } from '@/repositories/base';
 import { goalId } from '@/services/bodyService';
 import { dataEvents } from '@/services/events';
+import { syncKeys } from '@/sync/syncEngine';
 
 /**
  * Transfers records created before sign-in (owner `local`) to the signed-in
@@ -68,4 +69,34 @@ export async function countLocalRecords(db: SqlDatabase): Promise<number> {
     n += r?.n ?? 0;
   }
   return n;
+}
+
+/**
+ * Removes every local row of `userId` (after the account was deleted on the
+ * server) including queued changes, cursors and parked rows.
+ */
+export async function wipeAccountData(db: SqlDatabase, userId: string): Promise<string[]> {
+  const files: string[] = [];
+  await db.transaction(async (tx) => {
+    for (const entity of [...ENTITY_ORDER].reverse()) {
+      if ((MEDIA_ENTITIES as readonly string[]).includes(entity)) {
+        const rows = await tx.all<{ local_uri: string | null }>(
+          `SELECT local_uri FROM ${entity} WHERE user_id = ? AND local_uri IS NOT NULL`,
+          [userId],
+        );
+        for (const r of rows) if (r.local_uri) files.push(r.local_uri);
+      }
+      await tx.run(
+        `DELETE FROM sync_outbox WHERE entity = ? AND entity_id IN (SELECT id FROM ${entity} WHERE user_id = ?)`,
+        [entity, userId],
+      );
+      await tx.run(`DELETE FROM ${entity} WHERE user_id = ?`, [userId]);
+    }
+    await tx.run('DELETE FROM app_meta WHERE substr(key, 1, ?) = ? OR key = ?', [
+      syncKeys.prefix(userId).length,
+      syncKeys.prefix(userId),
+      `device.id.${userId}`,
+    ]);
+  });
+  return files;
 }

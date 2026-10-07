@@ -23,6 +23,8 @@ export interface AuthGateway {
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  /** Deletes the account and all server data (server-side function). */
+  deleteAccount(): Promise<void>;
   onChange(listener: (user: AuthUser | null) => void): () => void;
 }
 
@@ -96,6 +98,15 @@ export class SupabaseAuthGateway implements AuthGateway {
   async resetPassword(email: string): Promise<void> {
     const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim());
     if (error) throw mapAuthError(error);
+  }
+
+  async deleteAccount(): Promise<void> {
+    const { error } = await this.supabase.functions.invoke('delete-account', { method: 'POST' });
+    if (error) {
+      const context = (error as { context?: { status?: number } }).context;
+      throw new AppError(context?.status ? 'auth' : 'network', error.message, { cause: error });
+    }
+    await this.supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
   }
 
   onChange(listener: (user: AuthUser | null) => void): () => void {

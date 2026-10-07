@@ -1,13 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { getSupabase } from '@/backend/supabase';
+import { ENTITY_ORDER } from '@/database/schema';
 import { LOCAL_OWNER } from '@/domain/types';
 import { useServices } from '@/providers/ServicesProvider';
+import { dataEvents } from '@/services/events';
 import { ownerStore } from '@/services/ownerStore';
+import { deleteLocalFile } from '@/media/localFiles';
 import { AppError, toAppError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { SupabaseAuthGateway, type AuthGateway, type AuthUser, type SignUpResult } from './authGateway';
-import { claimLocalData } from './claimLocalData';
+import { claimLocalData, wipeAccountData } from './claimLocalData';
 
 export type AuthState =
   | { status: 'disabled' }
@@ -21,6 +24,7 @@ interface AuthContextValue {
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  deleteAccount(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -92,8 +96,17 @@ export function AuthProvider({
         setState({ status: 'signedOut' });
       },
       resetPassword: (email) => requireGateway().resetPassword(email),
+      deleteAccount: async () => {
+        if (state.status !== 'signedIn') throw new AppError('auth', 'Not signed in');
+        await requireGateway().deleteAccount();
+        const files = await wipeAccountData(db, state.user.id);
+        for (const uri of files) await deleteLocalFile(uri).catch(() => undefined);
+        ownerStore.set(LOCAL_OWNER);
+        setState({ status: 'signedOut' });
+        dataEvents.emit(ENTITY_ORDER);
+      },
     }),
-    [state, requireGateway],
+    [state, requireGateway, db],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -31,15 +31,18 @@ sequenceDiagram
 | Structure | Purpose |
 | --- | --- |
 | `sync_outbox(entity, entity_id UNIQUE, revision, attempts, last_error, next_attempt_at)` | One entry per locally changed record. Re-editing a queued record bumps `revision` instead of adding a second entry (coalescing). |
-| `app_meta['sync.cursor.<entity>']` | Last pulled `(server_updated_at, id)` pair per table. |
-| `app_meta['sync.orphans.<entity>']` | Pulled children whose parent is not present yet. |
-| `app_meta['sync.last_success_at']` | Last sync without failures (shown in Settings). |
+| `app_meta['sync.<user>.cursor.<entity>']` | Last pulled `(server_updated_at, id)` pair per table. |
+| `app_meta['sync.<user>.orphans.<entity>']` | Pulled children whose parent is not present yet. |
+| `app_meta['sync.<user>.last_success_at']` | Last sync without failures (shown in Settings). |
 | `app_meta['device.id.<user>']` | Stable id of this installation for the `devices` table. |
 | `server_updated_at`, `version` columns | Server metadata copied from the last pulled state. |
 
 Writes and their outbox entries are committed in the **same SQLite
 transaction** (`src/repositories/base.ts`), so a change can never be lost
 between "saved" and "queued".
+
+All bookkeeping keys are per account, so several people can use one device
+without one account's cursor hiding data of another.
 
 ## Algorithm
 
@@ -86,11 +89,11 @@ between "saved" and "queued".
      if the local edit is newer or equal it is kept (and pushed next run),
      otherwise the server state replaces it and the outbox entry is dropped.
    - A child whose parent is missing locally (foreign key failure) is parked
-     in `sync.orphans.<entity>` and retried at the start of the next pull.
+     in `sync.<user>.orphans.<entity>` and retried at the start of the next pull.
 8. **Purge.** Soft-deleted rows older than 30 days with no outbox entry are
    physically removed (children before parents); local media files of purged
    rows are deleted.
-9. `sync.last_success_at` is updated when the run had no failures; screens are
+9. `sync.<user>.last_success_at` is updated when the run had no failures; screens are
    notified via `dataEvents`.
 
 ## Server side guarantees
