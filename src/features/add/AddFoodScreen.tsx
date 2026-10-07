@@ -5,6 +5,7 @@ import { Switch, View } from 'react-native';
 import { MEAL_TYPES, type MealType, type Unit } from '@/domain/types';
 import { estimatePhotoToDraft, useRecognition } from '@/features/drafts/recognition';
 import { CaptureButtons, PhotoImage } from '@/features/photos/PhotoViews';
+import { VoiceDraftPanel, VoiceNoteRow, VoiceRecorder } from '@/features/voice/VoiceViews';
 import { errorText } from '@/i18n';
 import { useQuery } from '@/hooks/useQuery';
 import { inputNumber, NutritionFields } from '@/features/nutrition/NutritionFields';
@@ -14,6 +15,7 @@ import { mealTypeForTime, MealTypePicker, UnitPicker } from '@/features/nutritio
 import { useI18n, useTheme } from '@/providers/PreferencesProvider';
 import { useServices } from '@/providers/ServicesProvider';
 import type { PreparedPhoto } from '@/services/photoService';
+import type { RecordedAudio } from '@/services/voiceService';
 import { Button, IconButton } from '@/ui/Button';
 import { DateField } from '@/ui/Calendar';
 import { SegmentedControl } from '@/ui/Controls';
@@ -332,6 +334,31 @@ function PhotoTab({ target, onDone }: { target: AddTarget; onDone: () => void })
   );
 }
 
+function VoiceTab({ target }: { target: AddTarget }) {
+  const services = useServices();
+  const { m } = useI18n();
+  const toast = useToast();
+  const [saved, setSaved] = useState<{ mealId: string; noteId: string } | null>(null);
+  const note = useQuery(() => (saved ? services.voice.get(saved.noteId) : Promise.resolve(null)), [saved?.noteId], ['voice_notes']);
+  const draftTarget = { date: target.date, mealType: target.mealType, mealId: saved?.mealId ?? target.mealId };
+
+  const record = async (audio: RecordedAudio) => {
+    const mealId = saved?.mealId ?? (await services.meals.ensureMeal(target));
+    const noteId = await services.voice.add(mealId, audio);
+    setSaved({ mealId, noteId });
+    toast.show(m.common.saved);
+  };
+
+  return (
+    <Card>
+      <VoiceRecorder onRecorded={record} />
+      {note.data ? <VoiceNoteRow note={note.data} index={0} /> : null}
+      <Divider />
+      <VoiceDraftPanel key={note.data?.id ?? 'typed'} note={note.data ?? null} target={draftTarget} replace />
+    </Card>
+  );
+}
+
 export function AddFoodScreen() {
   const params = useLocalSearchParams<{ date?: string; meal?: string; mealId?: string; tab?: string }>();
   const { m } = useI18n();
@@ -343,6 +370,7 @@ export function AddFoodScreen() {
     { value: 'search', label: m.add.tabSearch },
     { value: 'manual', label: m.add.tabManual },
     { value: 'photo', label: m.add.tabPhoto },
+    { value: 'voice', label: m.add.tabVoice },
   ];
   const [tab, setTab] = useState<AddTab>(tabs.some((x) => x.value === params.tab) ? (params.tab as AddTab) : 'search');
 
@@ -364,6 +392,7 @@ export function AddFoodScreen() {
       <SegmentedControl label={m.add.title} options={tabs} value={tab} onChange={setTab} testID="add-tabs" />
       {tab === 'search' ? <SearchTab target={target} onDone={onDone} /> : null}
       {tab === 'manual' ? <ManualTab target={target} onDone={onDone} /> : null}
+      {tab === 'voice' ? <VoiceTab key={`${target.date}:${target.mealType}`} target={target} /> : null}
       {tab === 'photo' ? <PhotoTab key={`${target.date}:${target.mealType}`} target={target} onDone={onDone} /> : null}
     </Screen>
   );

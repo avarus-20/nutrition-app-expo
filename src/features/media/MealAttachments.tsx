@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import type { MealAttachmentsProps } from '@/features/nutrition/MealEditor';
 import { MealPhotosCard } from '@/features/photos/PhotoViews';
+import { MealVoiceCard } from '@/features/voice/VoiceViews';
 import { useTheme } from '@/providers/PreferencesProvider';
 
 /** Media column of the meal editor. */
@@ -12,6 +13,7 @@ export function MealAttachments({ meal }: MealAttachmentsProps) {
   return (
     <View style={{ gap: spacing.lg }}>
       <MealPhotosCard mealId={meal.id} target={target} />
+      <MealVoiceCard mealId={meal.id} target={target} />
     </View>
   );
 }

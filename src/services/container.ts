@@ -7,6 +7,7 @@ import { MealService, type OwnerProvider } from './mealService';
 import { PhotoService, type MediaFileStore } from './photoService';
 import { SettingsService } from './settingsService';
 import { StatsService } from './statsService';
+import { VoiceService } from './voiceService';
 
 export interface Services {
   db: SqlDatabase;
@@ -18,6 +19,7 @@ export interface Services {
   settings: SettingsService;
   stats: StatsService;
   photos: PhotoService;
+  voice: VoiceService;
   drafts: DraftService;
   files: MediaFileStore;
 }
@@ -34,6 +36,7 @@ export function createServices(db: SqlDatabase, owner: OwnerProvider, files: Med
     settings: new SettingsService(db),
     stats: new StatsService(db, owner),
     photos: new PhotoService(db, owner, files),
+    voice: new VoiceService(db, owner, files),
     drafts: new DraftService(db, owner, meals),
     files,
   };

@@ -6,6 +6,7 @@ import { GoalService, WaterService, WeightService } from '@/services/bodyService
 import { DraftService } from '@/services/draftService';
 import { MealService } from '@/services/mealService';
 import { PhotoService } from '@/services/photoService';
+import { VoiceService } from '@/services/voiceService';
 import { FakeFiles } from './fakeFiles';
 import { createTestDatabase } from './nodeDriver';
 
@@ -21,6 +22,7 @@ export function servicesFor(db: SqlDatabase, owner: { id: string } = { id: 'loca
   return {
     meals,
     photos: new PhotoService(db, o, files),
+    voice: new VoiceService(db, o, files),
     drafts: new DraftService(db, o, meals),
     files,
     foods: new FoodService(db, o),

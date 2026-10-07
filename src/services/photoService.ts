@@ -7,15 +7,9 @@ import { newId } from '@/utils/ids';
 import { logger } from '@/utils/logger';
 import { dataEvents } from './events';
 import type { OwnerProvider } from './mealService';
+import { ensureLocalCopy, extensionFor, type Downloader, type MediaFileStore } from './mediaFiles';
 
-/** Device file storage used by media services (see src/media/localFiles*.ts). */
-export interface MediaFileStore {
-  persistFile(sourceUri: string, name: string): Promise<{ uri: string; size: number | null }>;
-  readFileBytes(uri: string): Promise<Uint8Array>;
-  deleteLocalFile(uri: string): Promise<void>;
-  fileExists(uri: string): Promise<boolean>;
-  writeFileBytes(name: string, bytes: Uint8Array, mimeType: string): Promise<string>;
-}
+export type { MediaFileStore } from './mediaFiles';
 
 /** A compressed image ready to be stored (output of src/media/photoCapture.ts). */
 export interface PreparedPhoto {
@@ -28,7 +22,6 @@ export interface PreparedPhoto {
 export const MAX_PHOTOS_PER_MEAL = 10;
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
-const EXT: Record<PreparedPhoto['mimeType'], string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 /**
  * Meal photos. The binary is stored on the device first and the row is
@@ -62,7 +55,7 @@ export class PhotoService {
       throw new AppError('validation', 'Too many photos', { details: { photos: 'too_big' } });
     }
     const id = newId();
-    const stored = await this.files.persistFile(photo.uri, `${id}.${EXT[photo.mimeType]}`);
+    const stored = await this.files.persistFile(photo.uri, `${id}.${extensionFor(photo.mimeType)}`);
     if (stored.size !== null && stored.size > MAX_PHOTO_BYTES) {
       await this.files.deleteLocalFile(stored.uri);
       throw new AppError('validation', 'Photo is too large', { details: { photo: 'too_big' } });
@@ -126,14 +119,8 @@ export class PhotoService {
    * Returns a displayable local URI. Photos synchronized from another device
    * only have a `storage_path`; they are downloaded once and cached.
    */
-  async ensureLocal(photo: MediaFile, download: ((path: string) => Promise<Uint8Array>) | null): Promise<string | null> {
-    if (photo.local_uri && (await this.files.fileExists(photo.local_uri))) return photo.local_uri;
-    if (!photo.storage_path || !download) return null;
-    const bytes = await download(photo.storage_path);
-    const ext = EXT[photo.mime_type as PreparedPhoto['mimeType']] ?? 'bin';
-    const uri = await this.files.writeFileBytes(`${photo.id}.${ext}`, bytes, photo.mime_type);
-    await this.db.run('UPDATE media_files SET local_uri = ? WHERE id = ? AND user_id = ?', [uri, photo.id, this.owner()]);
-    return uri;
+  ensureLocal(photo: MediaFile, download: Downloader | null): Promise<string | null> {
+    return ensureLocalCopy(this.db, this.files, 'media_files', this.owner(), photo, download);
   }
 
   /** Raw bytes of the device copy (for analysis requests). */

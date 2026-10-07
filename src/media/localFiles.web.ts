@@ -16,14 +16,17 @@ function blobToDataUri(blob: Blob): Promise<string> {
   });
 }
 
-export async function persistFile(sourceUri: string, _name: string): Promise<{ uri: string; size: number | null }> {
+export async function persistFile(
+  sourceUri: string,
+  _name: string,
+): Promise<{ uri: string; size: number | null; mimeType: string | null }> {
   if (sourceUri.startsWith('data:')) {
     const blob = await (await fetch(sourceUri)).blob();
-    return { uri: sourceUri, size: blob.size };
+    return { uri: sourceUri, size: blob.size, mimeType: blob.type || null };
   }
   try {
     const blob = await (await fetch(sourceUri)).blob();
-    return { uri: await blobToDataUri(blob), size: blob.size };
+    return { uri: await blobToDataUri(blob), size: blob.size, mimeType: blob.type || null };
   } catch (error) {
     throw new AppError('database', 'Could not save the file in this browser', { cause: error });
   }

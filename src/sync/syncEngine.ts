@@ -12,6 +12,7 @@ import { enqueueChange } from '@/repositories/base';
 import { metaRepository } from '@/repositories/metaRepository';
 import { mediaRepository } from '@/repositories/mediaRepository';
 import { dataEvents } from '@/services/events';
+import { extensionFor } from '@/services/mediaFiles';
 import { AppError, errorMessage, toAppError } from '@/utils/errors';
 import { newId } from '@/utils/ids';
 import { logger } from '@/utils/logger';
@@ -66,22 +67,8 @@ const DEVICE_KEY = (userId: string) => `device.id.${userId}`;
 
 const MEDIA_FOLDER: Record<MediaEntity, string> = { media_files: 'photo', voice_notes: 'voice' };
 
-const EXTENSIONS: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'audio/mp4': 'm4a',
-  'audio/m4a': 'm4a',
-  'audio/x-m4a': 'm4a',
-  'audio/aac': 'aac',
-  'audio/mpeg': 'mp3',
-  'audio/webm': 'webm',
-  'audio/ogg': 'ogg',
-  'audio/wav': 'wav',
-};
-
 export function storagePathFor(entity: MediaEntity, userId: string, id: string, mimeType: string): string {
-  return `${userId}/${MEDIA_FOLDER[entity]}/${id}.${EXTENSIONS[mimeType] ?? 'bin'}`;
+  return `${userId}/${MEDIA_FOLDER[entity]}/${id}.${extensionFor(mimeType)}`;
 }
 
 /** Exponential backoff: 30 s, 1 min, 2 min ... capped at 6 h. */
