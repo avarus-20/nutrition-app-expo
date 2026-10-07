@@ -1,12 +1,16 @@
-import { useI18n } from '@/providers/PreferencesProvider';
-import { Screen } from '@/ui/Screen';
-import { EmptyState } from '@/ui/Surfaces';
+import { router, useLocalSearchParams } from 'expo-router';
+import React from 'react';
+
+import { DayView } from '@/features/nutrition/DayView';
+import { isValidLocalDate, todayLocalDate } from '@/utils/dates';
 
 export default function TodayScreen() {
-  const { m } = useI18n();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const date = params.date && isValidLocalDate(params.date) ? params.date : todayLocalDate();
   return (
-    <Screen title={m.nav.today}>
-      <EmptyState title={m.common.loading} />
-    </Screen>
+    <DayView
+      date={date}
+      onDateChange={(next) => router.setParams({ date: next === todayLocalDate() ? undefined : next })}
+    />
   );
 }

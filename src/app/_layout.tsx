@@ -49,7 +49,6 @@ function AppStack() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="add" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="drafts" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

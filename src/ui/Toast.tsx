@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {message ? (
-        <View pointerEvents="none" style={[styles.host, { bottom: insets.bottom + 88 }]}>
+        <View pointerEvents="none" style={[styles.host, { top: insets.top + 12 }]}>
           <View
             accessibilityLiveRegion="polite"
             style={{

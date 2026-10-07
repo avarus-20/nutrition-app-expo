@@ -101,11 +101,11 @@ export class MealService {
    */
   async addItemsToDay(
     target: { date: LocalDate; mealType: MealType; mealId?: string | null },
-    items: MealItemInput[],
+    items: (MealItemInput & { source?: MealItemSource })[],
     source: MealItemSource = 'manual',
   ): Promise<string> {
     if (items.length === 0) throw new AppError('validation', 'No items', { details: { items: 'too_small' } });
-    const validItems = items.map((i) => validate(mealItemInputSchema, i));
+    const validItems = items.map((i) => ({ input: validate(mealItemInputSchema, i), source: i.source ?? source }));
     const owner = this.owner();
     const mealId = await this.db.transaction(async (tx) => {
       let id = target.mealId ?? null;
@@ -131,7 +131,7 @@ export class MealService {
             }),
           ));
       }
-      for (const [i, item] of validItems.entries()) await this.insertItem(tx, owner, id, item, source, i);
+      for (const [i, item] of validItems.entries()) await this.insertItem(tx, owner, id, item.input, item.source, i);
       return id;
     });
     dataEvents.emit(['meals', 'meal_items']);
@@ -190,6 +190,38 @@ export class MealService {
       await updateEntity(tx, 'meal_items', owner, id, { meal_id: mealId });
     });
     dataEvents.emit(['meal_items']);
+  }
+
+  /** Moves an item to the meal of `mealType` on the item's day, creating that meal if needed. */
+  async moveItemToType(id: string, mealType: MealType): Promise<string> {
+    const owner = this.owner();
+    const targetId = await this.db.transaction(async (tx) => {
+      const current = await tx.first<{ meal_id: string; local_date: string; meal_type: MealType }>(
+        `SELECT i.meal_id, m.local_date, m.meal_type FROM meal_items i JOIN meals m ON m.id = i.meal_id
+         WHERE i.id = ? AND i.user_id = ? AND i.deleted_at IS NULL`,
+        [id, owner],
+      );
+      if (!current) throw new AppError('not_found', 'Item not found');
+      if (current.meal_type === mealType) return current.meal_id;
+      const existing = await mealRepository.findMealByType(tx, owner, current.local_date, mealType);
+      const mealId =
+        existing?.id ??
+        (await this.insertMeal(
+          tx,
+          owner,
+          validate(mealInputSchema, {
+            local_date: current.local_date,
+            eaten_at: defaultEatenAt(current.local_date, mealType),
+            meal_type: mealType,
+            title: null,
+            notes: null,
+          }),
+        ));
+      await updateEntity(tx, 'meal_items', owner, id, { meal_id: mealId });
+      return mealId;
+    });
+    dataEvents.emit(['meals', 'meal_items']);
+    return targetId;
   }
 
   async deleteItem(id: string): Promise<void> {

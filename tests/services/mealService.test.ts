@@ -106,6 +106,36 @@ describe('MealService', () => {
     expect(recent.map((r) => r.food_name.toLowerCase()).sort()).toEqual(['apple', 'rice']);
   });
 
+  it('moves an item to another meal type on the same day, creating the meal', async () => {
+    const db = await setupDb();
+    const { meals } = servicesFor(db);
+    const lunchId = await meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [item({ food_name: 'Soup' }), item()]);
+    const soup = (await meals.getMeal(lunchId))!.items.find((i) => i.food_name === 'Soup')!;
+    const dinnerId = await meals.moveItemToType(soup.id, 'dinner');
+    expect(dinnerId).not.toBe(lunchId);
+    const day = await meals.getDay(DAY);
+    expect(day.map((m) => [m.meal_type, m.items.map((i) => i.food_name)])).toEqual([
+      ['lunch', ['Egg']],
+      ['dinner', ['Soup']],
+    ]);
+    expect(await meals.moveItemToType(soup.id, 'dinner')).toBe(dinnerId);
+    await expect(meals.moveItemToType('missing', 'lunch')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('stores a per-item source in mixed batches', async () => {
+    const db = await setupDb();
+    const { meals } = servicesFor(db);
+    const id = await meals.addItemsToDay({ date: DAY, mealType: 'lunch' }, [
+      { ...item({ food_name: 'A' }), source: 'recent' },
+      item({ food_name: 'B' }),
+    ]);
+    const m = await meals.getMeal(id);
+    expect(m!.items.map((i) => [i.food_name, i.source])).toEqual([
+      ['A', 'recent'],
+      ['B', 'manual'],
+    ]);
+  });
+
   it('emits change events', async () => {
     const db = await setupDb();
     const { meals } = servicesFor(db);
