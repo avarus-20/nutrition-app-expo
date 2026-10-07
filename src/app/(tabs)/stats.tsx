@@ -1,12 +1,3 @@
-import { useI18n } from '@/providers/PreferencesProvider';
-import { Screen } from '@/ui/Screen';
-import { EmptyState } from '@/ui/Surfaces';
+import { StatsScreen } from '@/features/stats/StatsScreen';
 
-export default function StatsScreen() {
-  const { m } = useI18n();
-  return (
-    <Screen title={m.nav.stats}>
-      <EmptyState title={m.common.loading} />
-    </Screen>
-  );
-}
+export default StatsScreen;

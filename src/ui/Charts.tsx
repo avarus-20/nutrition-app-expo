@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { Platform, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useI18n, useTheme } from '@/providers/PreferencesProvider';
 import type { ColorTokens } from '@/theme/tokens';
 import { AppText } from './Text';
+
+const FONT = Platform.OS === 'web' ? 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' : undefined;
 
 export function ProgressRing({
   value,
@@ -122,7 +124,7 @@ export function BarChart({
                 />
               ) : null}
               {i % labelEvery === 0 ? (
-                <SvgText x={x + barW / 2} y={height - 6} fontSize={10} fill={colors.textMuted} textAnchor="middle">
+                <SvgText fontFamily={FONT} x={x + barW / 2} y={height - 6} fontSize={10} fill={colors.textMuted} textAnchor="middle">
                   {d.label}
                 </SvgText>
               ) : null}
@@ -140,7 +142,7 @@ export function BarChart({
               strokeDasharray="4 4"
               strokeWidth={1}
             />
-            <SvgText x={width - 2} y={y(goal) - 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
+            <SvgText fontFamily={FONT} x={width - 2} y={y(goal) - 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
               {formatValue(goal)}
             </SvgText>
           </>
@@ -196,7 +198,7 @@ export function LineChart({
         {[highY, (highY + lowY) / 2, lowY].map((v) => (
           <React.Fragment key={v}>
             <Line x1={pad.left} x2={pad.left + w} y1={sy(v)} y2={sy(v)} stroke={colors.border} strokeWidth={1} />
-            <SvgText x={width - 2} y={sy(v) + 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
+            <SvgText fontFamily={FONT} x={width - 2} y={sy(v) + 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
               {formatValue(v)}
             </SvgText>
           </React.Fragment>
@@ -208,10 +210,10 @@ export function LineChart({
         {trend && trend.length > 1 ? <Path d={path(trend)} stroke={colors.primary} strokeWidth={3} fill="none" /> : null}
         {xLabels ? (
           <>
-            <SvgText x={pad.left} y={height - 6} fontSize={10} fill={colors.textMuted}>
+            <SvgText fontFamily={FONT} x={pad.left} y={height - 6} fontSize={10} fill={colors.textMuted}>
               {xLabels[0]}
             </SvgText>
-            <SvgText x={pad.left + w} y={height - 6} fontSize={10} fill={colors.textMuted} textAnchor="end">
+            <SvgText fontFamily={FONT} x={pad.left + w} y={height - 6} fontSize={10} fill={colors.textMuted} textAnchor="end">
               {xLabels[1]}
             </SvgText>
           </>

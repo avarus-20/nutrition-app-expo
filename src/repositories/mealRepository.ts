@@ -81,6 +81,72 @@ export const mealRepository = {
     );
   },
 
+  /**
+   * Aggregates over the logged days (days with at least one item) of a
+   * range: averages, totals and calorie-goal completion, all in SQL.
+   */
+  async rangeSummary(
+    db: SqlExecutor,
+    ownerId: string,
+    from: LocalDate,
+    to: LocalDate,
+    calorieGoal: number | null,
+  ): Promise<{
+    logged_days: number;
+    avg_calories: number | null;
+    avg_protein_g: number | null;
+    avg_carbs_g: number | null;
+    avg_fat_g: number | null;
+    total_calories: number;
+    total_protein_g: number;
+    total_carbs_g: number;
+    total_fat_g: number;
+    goal_hit_days: number;
+  }> {
+    const row = await db.first<{
+      logged_days: number;
+      avg_calories: number | null;
+      avg_protein_g: number | null;
+      avg_carbs_g: number | null;
+      avg_fat_g: number | null;
+      total_calories: number | null;
+      total_protein_g: number | null;
+      total_carbs_g: number | null;
+      total_fat_g: number | null;
+      goal_hit_days: number | null;
+    }>(
+      `WITH daily AS (
+         SELECT m.local_date AS date,
+                SUM(i.calories) AS calories, SUM(i.protein_g) AS protein_g,
+                SUM(i.carbs_g) AS carbs_g, SUM(i.fat_g) AS fat_g
+         FROM meals m
+         JOIN meal_items i ON i.meal_id = m.id AND i.deleted_at IS NULL
+         WHERE m.user_id = ? AND m.deleted_at IS NULL AND m.local_date BETWEEN ? AND ?
+         GROUP BY m.local_date
+       )
+       SELECT COUNT(*) AS logged_days,
+              AVG(calories) AS avg_calories, AVG(protein_g) AS avg_protein_g,
+              AVG(carbs_g) AS avg_carbs_g, AVG(fat_g) AS avg_fat_g,
+              SUM(calories) AS total_calories, SUM(protein_g) AS total_protein_g,
+              SUM(carbs_g) AS total_carbs_g, SUM(fat_g) AS total_fat_g,
+              SUM(CASE WHEN ? IS NOT NULL AND calories <= ? THEN 1 ELSE 0 END) AS goal_hit_days
+       FROM daily`,
+      [ownerId, from, to, calorieGoal, calorieGoal],
+    );
+    return {
+      logged_days: row?.logged_days ?? 0,
+      avg_calories: row?.avg_calories ?? null,
+      avg_protein_g: row?.avg_protein_g ?? null,
+      avg_carbs_g: row?.avg_carbs_g ?? null,
+      avg_fat_g: row?.avg_fat_g ?? null,
+      total_calories: row?.total_calories ?? 0,
+      total_protein_g: row?.total_protein_g ?? 0,
+      total_carbs_g: row?.total_carbs_g ?? 0,
+      total_fat_g: row?.total_fat_g ?? 0,
+      goal_hit_days: row?.goal_hit_days ?? 0,
+    };
+  },
+
   /** Days that have at least one meal, newest first (paged). */
   async daysWithData(
     db: SqlExecutor,
