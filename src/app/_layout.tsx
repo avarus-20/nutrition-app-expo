@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { ActivityIndicator, Button, Text, View } from 'react-native';
 
+import { AuthProvider } from '@/auth/AuthProvider';
 import { I18nProvider } from '@/lib/i18n';
 import { ServicesProvider, useBoot } from '@/providers/ServicesProvider';
 
@@ -24,9 +25,11 @@ export default function RootLayout() {
   }
   return (
     <ServicesProvider services={boot.services}>
-      <I18nProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </I18nProvider>
+      <AuthProvider>
+        <I18nProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </I18nProvider>
+      </AuthProvider>
     </ServicesProvider>
   );
 }

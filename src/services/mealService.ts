@@ -73,9 +73,12 @@ export class MealService {
     mealId: string,
     input: MealItemInput,
     source: MealItemSource,
+    position = 0,
   ): Promise<string> {
     const id = newId();
-    await insertEntity(tx, 'meal_items', { ...baseRow(id, owner), ...input, meal_id: mealId, source });
+    // Distinct, increasing timestamps keep the entry order of a batch stable.
+    const ts = new Date(Date.now() + position).toISOString();
+    await insertEntity(tx, 'meal_items', { ...baseRow(id, owner, ts), ...input, meal_id: mealId, source });
     return id;
   }
 
@@ -85,7 +88,7 @@ export class MealService {
     const owner = this.owner();
     const id = await this.db.transaction(async (tx) => {
       const mealId = await this.insertMeal(tx, owner, meal);
-      for (const item of validItems) await this.insertItem(tx, owner, mealId, item, source);
+      for (const [i, item] of validItems.entries()) await this.insertItem(tx, owner, mealId, item, source, i);
       return mealId;
     });
     dataEvents.emit(['meals', 'meal_items']);
@@ -128,7 +131,7 @@ export class MealService {
             }),
           ));
       }
-      for (const item of validItems) await this.insertItem(tx, owner, id, item, source);
+      for (const [i, item] of validItems.entries()) await this.insertItem(tx, owner, id, item, source, i);
       return id;
     });
     dataEvents.emit(['meals', 'meal_items']);
