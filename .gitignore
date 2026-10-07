@@ -37,3 +37,14 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# build output / secrets
+.env
+.env.*
+!.env.example
+coverage/
+deno.lock
+
+# Playwright
+test-results/
+playwright-report/
