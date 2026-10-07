@@ -27,7 +27,7 @@ Read this before changing the repository.
 | lint (React Compiler rules, zero warnings) | `npm run lint` |
 | typecheck | `npm run typecheck` |
 | unit + UI tests | `npm test` |
-| PostgreSQL tests | `npm run test:db` (needs `PG*` env pointing at PostgreSQL 16) |
+| PostgreSQL tests | `npm run test:db` (PostgreSQL 16 at `TEST_DATABASE_URL`, default `postgres:postgres@localhost:5432`) |
 | Edge Function tests | `DENO_NO_PACKAGE_JSON=1 deno test supabase/functions/` |
 | Edge Function typecheck | `DENO_NO_PACKAGE_JSON=1 deno check supabase/functions/<name>/index.ts` (each function separately) |
 | web build + PWA checks | `npm run web:build` |
