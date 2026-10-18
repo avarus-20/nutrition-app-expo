@@ -16,7 +16,7 @@ test('JSON backup restores into a fresh browser profile; CSV export; bad files r
   const jsonPath = testInfo.outputPath('backup.json');
   await jsonDownload.saveAs(jsonPath);
   const backup = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  expect(backup).toMatchObject({ format: 'nutrition-tracker-backup', version: 1 });
+  expect(backup).toMatchObject({ format: 'nutrition-tracker-backup', version: 2, source_owner: 'local' });
   expect(backup.data.meal_items).toHaveLength(1);
 
   const [csvDownload] = await Promise.all([page.waitForEvent('download'), page.getByTestId('backup-export-csv').click()]);
