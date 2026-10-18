@@ -66,6 +66,19 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     }
   };
 
+  // FI: Onnistunut salasanan vaihto näkyy, vaikka palautusoikeus on käytetty.
+  // RU: После смены пароля показываем успех, хотя разрешение восстановления уже погашено.
+  if (mode === 'update' && message?.tone === 'success') {
+    return (
+      <Screen title={title} back backHref="/auth/sign-in" maxWidth={480}>
+        <Card>
+          <Banner tone="success" message={message.text} />
+          <Button label={m.auth.haveAccount} onPress={() => router.replace('/auth/sign-in')} />
+        </Card>
+      </Screen>
+    );
+  }
+
   if (mode === 'update' && !hasVerifiedRecovery(state.status, recoveryReady)) {
     return (
       <Screen title={title} back backHref="/auth/sign-in">
