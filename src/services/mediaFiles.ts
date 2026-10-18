@@ -1,3 +1,4 @@
+import { dataEvents } from './events';
 import type { MediaEntity } from '@/database/schema';
 import type { SqlExecutor } from '@/database/types';
 
@@ -51,6 +52,9 @@ export async function ensureLocalCopy(
   if (!row.storage_path || !download) return null;
   const bytes = await download(row.storage_path);
   const uri = await files.writeFileBytes(`${row.id}.${extensionFor(row.mime_type)}`, bytes, row.mime_type);
-  await db.run(`UPDATE ${entity} SET local_uri = ? WHERE id = ? AND user_id = ?`, [uri, row.id, ownerId]);
-  return uri;
+  const result = await db.run(`UPDATE ${entity} SET local_uri = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [uri, row.id, ownerId]);
+  // FI: Päivitetään näkymät, kun etälaitteen tiedosto on ladattu.
+  // RU: Обновляем интерфейс после загрузки файла с другого устройства.
+  if (result.changes > 0) dataEvents.emit([entity]);
+  return result.changes > 0 ? uri : null;
 }
