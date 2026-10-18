@@ -222,3 +222,71 @@ describe('BackupService restore', () => {
     expect(await count(db, 'water_entries')).toBe(0);
   });
 });
+
+describe('BackupService account isolation', () => {
+  const OTHER_USER = '22222222-2222-4222-8222-222222222222';
+
+  it('re-keys an imported backup for another account and its dependent references', async () => {
+    const { db, s, foodId } = await seeded();
+    await s.meals.addItemsToDay(
+      { date: '2024-05-03', mealType: 'lunch' },
+      [item({ food_id: foodId, source: 'food' })],
+    );
+    const original = parseBackup(await s.backup.exportJson());
+    const first = servicesFor(db, { id: USER });
+    expect((await first.backup.restore(original)).inserted).toBe(10);
+    const transferred = parseBackup(await first.backup.exportJson());
+    expect(transferred.source_owner).toBe(USER);
+
+    // FI: Samassa tietokannassa oleva lähdetili ei saa estää tuontia.
+    // RU: Исходный аккаунт на том же устройстве не должен мешать импорту.
+    const second = servicesFor(db, { id: OTHER_USER });
+    expect((await second.backup.restore(transferred)).inserted).toBe(10);
+    expect(await second.foods.favorites()).toHaveLength(1);
+
+    const sourceFood = (await db.all<{ id: string }>(
+      'SELECT id FROM foods WHERE user_id = ?', [USER],
+    ))[0]!.id;
+    const destFood = (await db.all<{ id: string }>(
+      'SELECT id FROM foods WHERE user_id = ?', [OTHER_USER],
+    ))[0]!.id;
+    expect(destFood).not.toBe(sourceFood);
+    const linked = await db.first<{ food_id: string; meal_id: string }>(
+      'SELECT food_id, meal_id FROM meal_items WHERE user_id = ? AND food_id IS NOT NULL',
+      [OTHER_USER],
+    );
+    expect(linked?.food_id).toBe(destFood);
+    expect((await db.first<{ id: string }>(
+      'SELECT id FROM meals WHERE user_id = ? AND id = ?', [OTHER_USER, linked?.meal_id],
+    ))?.id).toBe(linked?.meal_id);
+    expect((await second.backup.restore(transferred))).toEqual({
+      inserted: 0, updated: 0, skipped: 10,
+    });
+  });
+
+  it('reads legacy v1 backups without trusting unknown source ownership', async () => {
+    const { s } = await seeded();
+    const old = JSON.parse(await s.backup.exportJson()) as Record<string, unknown>;
+    old.version = 1;
+    delete old.source_owner;
+    const previous = parseBackup(JSON.stringify(old));
+    expect(previous.source_owner).toBeNull();
+    const db = await setupDb();
+    const target = servicesFor(db, { id: USER });
+    expect((await target.backup.restore(previous)).inserted).toBe(8);
+    const importedFood = (await db.first<{ id: string }>(
+      'SELECT id FROM foods WHERE user_id = ?', [USER],
+    ))!.id;
+    expect(importedFood).not.toBe(previous.data.foods[0]!.id);
+    expect((await target.backup.restore(previous)).skipped).toBe(8);
+  });
+
+  it('rejects v2 backups without an origin marker', async () => {
+    const { s } = await seeded();
+    const raw = JSON.parse(await s.backup.exportJson()) as Record<string, unknown>;
+    delete raw.source_owner;
+    expect(() => parseBackup(JSON.stringify(raw))).toThrow(
+      expect.objectContaining({ code: 'invalid_import' }),
+    );
+  });
+});
