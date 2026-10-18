@@ -55,6 +55,12 @@ export async function ensureLocalCopy(
   const result = await db.run(`UPDATE ${entity} SET local_uri = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [uri, row.id, ownerId]);
   // FI: Päivitetään näkymät, kun etälaitteen tiedosto on ladattu.
   // RU: Обновляем интерфейс после загрузки файла с другого устройства.
-  if (result.changes > 0) dataEvents.emit([entity]);
-  return result.changes > 0 ? uri : null;
+  if (result.changes > 0) {
+    dataEvents.emit([entity]);
+    return uri;
+  }
+  // FI: Jos tietue poistettiin latauksen aikana, poistetaan irrallinen tiedosto.
+  // RU: Если запись удалена во время загрузки, удаляем оставшийся файл.
+  await files.deleteLocalFile(uri).catch(() => undefined);
+  return null;
 }
