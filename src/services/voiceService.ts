@@ -68,7 +68,7 @@ export class VoiceService {
     if (!isSupportedMimeType(mimeType) || !mimeType.startsWith('audio/')) await reject(`Unsupported audio type ${mimeType}`);
     if (stored.size !== null && (stored.size === 0 || stored.size > MAX_VOICE_BYTES)) await reject('Recording is empty or too large');
     const duration =
-      audio.durationMs === null ? null : Math.max(0, Math.min(Math.round(audio.durationMs), MAX_VOICE_DURATION_MS + 5_000));
+      audio.durationMs === null ? null : Math.max(0, Math.min(Math.round(audio.durationMs), MAX_VOICE_DURATION_MS));
     try {
       await this.db.transaction((tx) =>
         insertEntity(tx, 'voice_notes', {
