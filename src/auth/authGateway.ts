@@ -144,6 +144,20 @@ export class SupabaseAuthGateway implements AuthGateway {
   }
 }
 
+/**
+ * Preserve a verified recovery grant across duplicate SIGNED_IN events for
+ * the same account; clear it on logout or account changes.
+ */
+export function nextRecoveryOwner(
+  currentOwner: string | null,
+  event: string,
+  userId: string | null,
+): string | null {
+  if (!userId || event === 'SIGNED_OUT') return null;
+  if (event === 'PASSWORD_RECOVERY') return userId;
+  return currentOwner === userId ? currentOwner : null;
+}
+
 /** A normal authenticated session must never unlock the recovery form. */
 export function hasVerifiedRecovery(status: string, recoveryReady: boolean): boolean {
   return status === 'signedIn' && recoveryReady;
