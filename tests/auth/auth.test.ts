@@ -1,4 +1,5 @@
-import { mapAuthError, validateCredentials } from '@/auth/authGateway';
+import { mapAuthError, SupabaseAuthGateway, validateCredentials } from '@/auth/authGateway';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { claimLocalData, countLocalRecords } from '@/auth/claimLocalData';
 import { goalId } from '@/services/bodyService';
 import { item, servicesFor, setupDb } from '../helpers/fixtures';
@@ -60,5 +61,42 @@ describe('claiming local data on sign-in', () => {
     const db = await setupDb();
     expect(await claimLocalData(db, USER)).toBe(0);
     expect(await claimLocalData(db, 'local')).toBe(0);
+  });
+});
+
+describe('password recovery', () => {
+  it('sends recovery to the update-password route and updates the credentials', async () => {
+    const resetPasswordForEmail = jest.fn().mockResolvedValue({ error: null });
+    const updateUser = jest.fn().mockResolvedValue({ error: null });
+    const gateway = new SupabaseAuthGateway({
+      auth: { resetPasswordForEmail, updateUser },
+    } as unknown as SupabaseClient);
+    await gateway.resetPassword(' person@example.com ');
+    expect(resetPasswordForEmail).toHaveBeenCalledWith('person@example.com', {
+      redirectTo: expect.stringContaining('/auth/update-password'),
+    });
+    await gateway.updatePassword('new-very-safe-password');
+    expect(updateUser).toHaveBeenCalledWith({ password: 'new-very-safe-password' });
+    await expect(gateway.updatePassword('short')).rejects.toMatchObject({ code: 'auth_weak_password' });
+  });
+
+  it('accepts only recovery deep links and exchanges tokens for a session', async () => {
+    const setSession = jest.fn().mockResolvedValue({ error: null });
+    const verifyOtp = jest.fn().mockResolvedValue({ error: null });
+    const gateway = new SupabaseAuthGateway({
+      auth: { setSession, verifyOtp },
+    } as unknown as SupabaseClient);
+    expect(await gateway.acceptRecoveryLink('nutritiontracker://auth/sign-in')).toBe(false);
+    expect(await gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password#type=recovery&access_token=access&refresh_token=refresh',
+    )).toBe(true);
+    expect(setSession).toHaveBeenCalledWith({ access_token: 'access', refresh_token: 'refresh' });
+    expect(await gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password?type=recovery&token_hash=abc',
+    )).toBe(true);
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: 'abc', type: 'recovery' });
+    await expect(gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password#type=recovery',
+    )).rejects.toMatchObject({ code: 'auth' });
   });
 });
