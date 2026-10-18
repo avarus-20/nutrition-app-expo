@@ -67,3 +67,9 @@ Served with (single source `scripts/web-headers.mjs`, enforced by `scripts/build
 ## Reporting
 
 Please report vulnerabilities privately to the repository owner (GitHub security advisories) rather than in public issues.
+
+## Account transfer and recovery
+
+Version 2 backups contain `source_owner` (source account UUID or `local`), which must be considered private metadata. Restoring under a different account derives destination-scoped UUIDs and rewrites dependent food/meal references, preventing reuse of another account's globally keyed rows in PostgreSQL. Restore validation and RLS remain necessary; the owner marker is not proof of identity.
+
+Password reset sends an email deep link to `/auth/update-password`. The app exchanges native recovery tokens for a Supabase session or lets the Supabase web client consume the callback, then calls `updateUser({ password })`. Configure explicit allowed redirects in the Supabase dashboard; do not log tokens or ship without testing real hosted and native flows. Tokens are not persisted in app code or committed files.
