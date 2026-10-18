@@ -167,3 +167,32 @@ function remoteWithFiles(remote: FakeRemote, files: FakeFiles) {
     },
   };
 }
+
+describe('remote media download races', () => {
+  it('removes a downloaded file if its photo was deleted before caching it', async () => {
+    const db = await setupDb();
+    const s = servicesFor(db, { id: USER });
+    const mealId = await s.meals.ensureMeal({ date: DAY, mealType: 'lunch' });
+    const id = await s.photos.add(mealId, photo());
+    const original = await s.photos.get(id);
+    await s.files.deleteLocalFile(original!.local_uri!);
+    await db.run(
+      'UPDATE media_files SET local_uri = NULL, storage_path = ? WHERE id = ?',
+      [`${USER}/photo/${id}.jpg`, id],
+    );
+    const remotePhoto = await s.photos.get(id);
+    const write = s.files.writeFileBytes.bind(s.files);
+    s.files.writeFileBytes = async (name, bytes) => {
+      const uri = await write(name, bytes);
+      // FI: Poistetaan tietue ennen kuin latauksen tila tallentuu.
+      // RU: Удаляем запись до сохранения результата загрузки.
+      await s.photos.remove(id);
+      return uri;
+    };
+    expect(await s.photos.ensureLocal(
+      remotePhoto!,
+      async () => new TextEncoder().encode('remote image'),
+    )).toBeNull();
+    expect(s.files.files.size).toBe(0);
+  });
+});
