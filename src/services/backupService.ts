@@ -258,7 +258,7 @@ export class BackupService {
       }
       for (const entity of BACKUP_ENTITIES) {
         for (const row of backup.data[entity]) {
-          const mapped: Row = { ...row, id: ids.get(String(row.id)) ?? row.id };
+          const mapped: Row = { ...row, id: ids.get(String(row.id)) ?? String(row.id) };
           if (entity === 'favorite_foods' || entity === 'meal_items') {
             if (typeof row.food_id === 'string') {
               mapped.food_id = ids.get(row.food_id) ?? (transfer ? null : row.food_id);
