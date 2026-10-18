@@ -28,7 +28,7 @@ export interface AuthGateway {
   acceptRecoveryLink(url: string): Promise<boolean>;
   /** Deletes the account and all server data (server-side function). */
   deleteAccount(): Promise<void>;
-  onChange(listener: (user: AuthUser | null) => void): () => void;
+  onChange(listener: (user: AuthUser | null, event: string) => void): () => void;
 }
 
 interface ErrorLike {
@@ -144,8 +144,8 @@ export class SupabaseAuthGateway implements AuthGateway {
     await this.supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
   }
 
-  onChange(listener: (user: AuthUser | null) => void): () => void {
-    const { data } = this.supabase.auth.onAuthStateChange((_event, session) => listener(toUser(session?.user)));
+  onChange(listener: (user: AuthUser | null, event: string) => void): () => void {
+    const { data } = this.supabase.auth.onAuthStateChange((event, session) => listener(toUser(session?.user), event));
     return () => data.subscription.unsubscribe();
   }
 }
