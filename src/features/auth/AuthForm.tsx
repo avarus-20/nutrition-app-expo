@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { validateCredentials } from '@/auth/authGateway';
+import { hasVerifiedRecovery, validateCredentials } from '@/auth/authGateway';
 import { errorText } from '@/i18n';
 import { useI18n, useTheme } from '@/providers/PreferencesProvider';
 import { Button } from '@/ui/Button';
@@ -66,7 +66,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     }
   };
 
-  if (mode === 'update' && (state.status !== 'signedIn' || !recoveryReady)) {
+  if (mode === 'update' && !hasVerifiedRecovery(state.status, recoveryReady)) {
     return (
       <Screen title={title} back backHref="/auth/sign-in">
         <Banner tone="info" message={state.status === 'loading' ? m.common.loading : m.auth.recoveryInvalid} />
