@@ -21,7 +21,7 @@ Everything works without an account: data is stored on the device in SQLite. Sig
 - **Languages**: English, Russian, Finnish (system default or manual); **themes**: system / light / dark; responsive layout (bottom tabs on phones, sidebar on wide screens); screen-reader labels, focus styles, WCAG 2.1 AA checked with axe.
 - **PWA**: installable, works offline after the first visit, update prompt.
 
-The previous prototype's data (AsyncStorage `meals_YYYY-MM-DD`) is imported automatically and idempotently on first start; the original keys are kept.
+The previous prototype's data (AsyncStorage `meals_YYYY-MM-DD`) is imported automatically and idempotently on first start; the original keys are kept. JSON backups use format v2 with account-aware restores; v1 files remain readable.
 
 ## Quick start
 
@@ -87,3 +87,7 @@ docs/               product, architecture, data, sync, security, privacy, testin
 ## Security in one paragraph
 
 The app only contains client-safe configuration (Supabase URL and publishable/anon key). All access is enforced by PostgreSQL Row Level Security and private storage policies; AI provider keys and the service role exist only as Edge Function secrets. No secrets are committed — see [docs/SECURITY.md](docs/SECURITY.md).
+
+## Project status and review
+
+Production-oriented v2 was merged via [PR #2](https://github.com/avarus-20/nutrition-app-expo/pull/2). The codebase includes mocked/local CI tests, but hosted Supabase credentials, native cloud builds, real password-recovery emails and actual device verification are **not configured or verified by this repository**. A post-merge review identified four issues (backup import across accounts, password reset completion, remote media refresh and the voice duration limit); fixes are tracked in a separate review PR, subject to CI and manual hosted validation. See [execution status](docs/EXECUTION_STATUS.md), [deployment](docs/DEPLOYMENT.md) and [release checklist](docs/RELEASE.md).
