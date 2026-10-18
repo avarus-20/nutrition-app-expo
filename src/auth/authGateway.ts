@@ -100,7 +100,7 @@ export class SupabaseAuthGateway implements AuthGateway {
 
   async resetPassword(email: string): Promise<void> {
     // Both the website and the native deep link land on a password editor.
-    const redirectTo = Linking.createURL('/auth/update-password');
+    const redirectTo = `${Linking.createURL('/auth/update-password')}?type=recovery`;
     const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
     if (error) throw mapAuthError(error);
   }
@@ -111,27 +111,21 @@ export class SupabaseAuthGateway implements AuthGateway {
     if (error) throw mapAuthError(error);
   }
 
-  /** Native recovery links carry session tokens in the URL fragment.
-   * Web recovery is handled by Supabase's detectSessionInUrl option.
+  /**
+   * Native callbacks must exchange a PKCE auth code created by a recovery
+   * request on this SAME device. Never install caller-supplied session tokens:
+   * another app can invoke public custom URI schemes.
    */
   async acceptRecoveryLink(url: string): Promise<boolean> {
-    const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1];
-    const params = new URLSearchParams(fragment ?? '');
+    if (!url.includes('/auth/update-password?')) return false;
+    const params = new URLSearchParams(url.split('?')[1]?.split('#')[0] ?? '');
     if (params.get('type') !== 'recovery') return false;
-    const access_token = params.get('access_token');
-    const refresh_token = params.get('refresh_token');
-    if (access_token && refresh_token) {
-      const { error } = await this.supabase.auth.setSession({ access_token, refresh_token });
-      if (error) throw mapAuthError(error);
-    } else if (params.get('token_hash')) {
-      const { error } = await this.supabase.auth.verifyOtp({
-        token_hash: params.get('token_hash')!,
-        type: 'recovery',
-      });
-      if (error) throw mapAuthError(error);
-    } else {
-      throw new AppError('auth', 'Recovery link is incomplete');
-    }
+    const code = params.get('code');
+    if (!code) throw new AppError('auth', 'Expected a PKCE recovery code');
+    // FI: Koodin vaihto vaatii aiemmin tähän laitteeseen tallennetun PKCE-varmenteen.
+    // RU: Обмен кода требует PKCE-верификатор, ранее сохранённый на этом устройстве.
+    const { error } = await this.supabase.auth.exchangeCodeForSession(code);
+    if (error) throw mapAuthError(error);
     return true;
   }
 
