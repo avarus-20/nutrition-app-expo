@@ -4,7 +4,7 @@ jest.mock('expo-linking', () => ({
   createURL: (path: string) => `nutritiontracker://${path}`,
 }));
 
-import { mapAuthError, SupabaseAuthGateway, validateCredentials } from '@/auth/authGateway';
+import { hasVerifiedRecovery, mapAuthError, SupabaseAuthGateway, validateCredentials } from '@/auth/authGateway';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { claimLocalData, countLocalRecords } from '@/auth/claimLocalData';
 import { goalId } from '@/services/bodyService';
@@ -104,5 +104,14 @@ describe('password recovery', () => {
     await expect(gateway.acceptRecoveryLink(
       'nutritiontracker://auth/update-password#type=recovery',
     )).rejects.toMatchObject({ code: 'auth' });
+  });
+});
+
+describe('recovery authorization gate', () => {
+  it('rejects ordinary sessions and only permits verified recovery', () => {
+    expect(hasVerifiedRecovery('signedIn', false)).toBe(false);
+    expect(hasVerifiedRecovery('signedOut', true)).toBe(false);
+    expect(hasVerifiedRecovery('loading', true)).toBe(false);
+    expect(hasVerifiedRecovery('signedIn', true)).toBe(true);
   });
 });
