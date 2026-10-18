@@ -230,7 +230,7 @@ describe('BackupService account isolation', () => {
     const { db, s, foodId } = await seeded();
     await s.meals.addItemsToDay(
       { date: '2024-05-03', mealType: 'lunch' },
-      [item({ food_id: foodId, source: 'food' })],
+      [item({ food_id: foodId })],
     );
     const original = parseBackup(await s.backup.exportJson());
     const first = servicesFor(db, { id: USER });
@@ -257,7 +257,7 @@ describe('BackupService account isolation', () => {
     );
     expect(linked?.food_id).toBe(destFood);
     expect((await db.first<{ id: string }>(
-      'SELECT id FROM meals WHERE user_id = ? AND id = ?', [OTHER_USER, linked?.meal_id],
+      'SELECT id FROM meals WHERE user_id = ? AND id = ?', [OTHER_USER, linked?.meal_id ?? null],
     ))?.id).toBe(linked?.meal_id);
     expect((await second.backup.restore(transferred))).toEqual({
       inserted: 0, updated: 0, skipped: 10,
