@@ -11,7 +11,7 @@ import { ownerStore } from '@/services/ownerStore';
 import { deleteLocalFile } from '@/media/localFiles';
 import { AppError, toAppError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import { SupabaseAuthGateway, type AuthGateway, type AuthUser, type SignUpResult } from './authGateway';
+import { hasVerifiedRecovery, SupabaseAuthGateway, type AuthGateway, type AuthUser, type SignUpResult } from './authGateway';
 import { claimLocalData, wipeAccountData } from './claimLocalData';
 
 export type AuthState =
@@ -134,7 +134,7 @@ export function AuthProvider({
       },
       resetPassword: (email) => requireGateway().resetPassword(email),
       updatePassword: async (password) => {
-        if (!recoveryReady || state.status !== 'signedIn') {
+        if (!hasVerifiedRecovery(state.status, recoveryReady)) {
           throw new AppError('auth', 'A verified recovery session is required');
         }
         await requireGateway().updatePassword(password);
