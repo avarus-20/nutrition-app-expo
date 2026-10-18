@@ -150,6 +150,11 @@ export class SupabaseAuthGateway implements AuthGateway {
   }
 }
 
+/** A normal authenticated session must never unlock the recovery form. */
+export function hasVerifiedRecovery(status: string, recoveryReady: boolean): boolean {
+  return status === 'signedIn' && recoveryReady;
+}
+
 export function validateCredentials(email: string, password: string): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'invalid_email';
