@@ -22,6 +22,9 @@ export function getSupabase(): SupabaseClient | null {
         storage: globalThis.localStorage,
         autoRefreshToken: true,
         persistSession: true,
+        // FI: PKCE sitoo palautuslinkin tällä laitteella aloitettuun pyyntöön.
+        // RU: PKCE привязывает ссылку восстановления к запросу с этого устройства.
+        flowType: 'pkce',
         detectSessionInUrl: Platform.OS === 'web',
       },
     });
