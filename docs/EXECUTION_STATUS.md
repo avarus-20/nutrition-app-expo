@@ -1,6 +1,6 @@
 # Execution status
 
-Branch: `agent/nutrition-production-v2` · Base: `main`
+Shipped branch: `agent/nutrition-production-v2` → `main` via [PR #2](https://github.com/avarus-20/nutrition-app-expo/pull/2) on 2026-10-07.
 
 ## Recovery procedure (for a new agent session)
 
@@ -11,7 +11,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 
 ## Current stage
 
-**Final PR** (Stages 0–14 and final audit complete; PR open for human review, not merged)
+**Merged to `main`** (Stages 0–14 and final audit completed; PR #2 merged 2026-10-07). Code review follow-up: `fix/codex-review-recovery-backup-media`.
 
 ## Stages
 
@@ -31,7 +31,7 @@ Branch: `agent/nutrition-production-v2` · Base: `main`
 - [x] Stage 13 — PWA and deployment
 - [x] Stage 14 — Production hardening
 - [x] Final audit and cyclic validation
-- [ ] Final PR
+- [x] Final PR merged (#2, 2026-10-07)
 
 ## Important architectural decisions
 
@@ -102,4 +102,8 @@ Implemented (`src/sync/`): outbox push with batching/isolation/backoff, media up
 
 ## Latest important commit
 
-See `git log -1` on `agent/nutrition-production-v2` (documentation and audit commits follow `0b92344`, the last functional change).
+Merged base: `63de898f0e019470e8270340dedea71193ae879d` (PR #2). Further changes should have their own PR, CI and review.
+
+## Post-merge review remediation (2026-10-18)
+
+Codex found four actionable issues in PR #2 **after it had already been merged**. A follow-up branch fixes backup owner re-keying, account recovery, downloaded media notifications and the 180-second voice limit, with regression tests. This section describes proposed changes until the follow-up PR is merged. Run the full CI suite and test Supabase recovery links on a hosted staging instance plus native device before shipping; passing mocked tests does not verify external credentials or deep-link allow-lists.
