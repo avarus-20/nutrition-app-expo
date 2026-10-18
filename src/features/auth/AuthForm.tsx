@@ -16,7 +16,7 @@ import { toAppError } from '@/utils/errors';
 export type AuthMode = 'signIn' | 'signUp' | 'reset' | 'update';
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
-  const { state, signIn, signUp, resetPassword, updatePassword } = useAuth();
+  const { state, recoveryReady, signIn, signUp, resetPassword, updatePassword } = useAuth();
   const { m } = useI18n();
   const { spacing } = useTheme();
   const [email, setEmail] = useState('');
@@ -66,7 +66,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     }
   };
 
-  if (mode === 'update' && state.status !== 'signedIn') {
+  if (mode === 'update' && (state.status !== 'signedIn' || !recoveryReady)) {
     return (
       <Screen title={title} back backHref="/auth/sign-in">
         <Banner tone="info" message={state.status === 'loading' ? m.common.loading : m.auth.recoveryInvalid} />
