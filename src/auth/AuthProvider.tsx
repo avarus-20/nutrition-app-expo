@@ -1,4 +1,6 @@
+import * as Linking from 'expo-linking';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { getSupabase } from '@/backend/supabase';
 import { ENTITY_ORDER } from '@/database/schema';
@@ -24,6 +26,7 @@ interface AuthContextValue {
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  updatePassword(password: string): Promise<void>;
   deleteAccount(): Promise<void>;
 }
 
@@ -78,6 +81,25 @@ export function AuthProvider({
     };
   }, [db, gateway]);
 
+  useEffect(() => {
+    if (!gateway || Platform.OS === 'web') return;
+    let active = true;
+    const accept = async (url: string) => {
+      if (!active) return;
+      try {
+        await gateway.acceptRecoveryLink(url);
+      } catch (error) {
+        logger.warn('auth', 'password recovery link could not be verified', toAppError(error));
+      }
+    };
+    const subscription = Linking.addEventListener('url', ({ url }) => { void accept(url); });
+    void Linking.getInitialURL().then((url) => { if (url) void accept(url); });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [gateway]);
+
   const requireGateway = useCallback((): AuthGateway => {
     if (!gateway) throw new AppError('not_configured', 'Backend not configured');
     return gateway;
@@ -96,6 +118,7 @@ export function AuthProvider({
         setState({ status: 'signedOut' });
       },
       resetPassword: (email) => requireGateway().resetPassword(email),
+      updatePassword: (password) => requireGateway().updatePassword(password),
       deleteAccount: async () => {
         if (state.status !== 'signedIn') throw new AppError('auth', 'Not signed in');
         await requireGateway().deleteAccount();
