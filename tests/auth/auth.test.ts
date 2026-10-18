@@ -1,3 +1,9 @@
+// FI: Expo Linking tarvitsee testissä oman URL-ratkaisijan ilman sovellusmanifestia.
+// RU: В тесте подменяем Expo Linking, поскольку манифест приложения недоступен.
+jest.mock('expo-linking', () => ({
+  createURL: (path: string) => `nutritiontracker://${path}`,
+}));
+
 import { mapAuthError, SupabaseAuthGateway, validateCredentials } from '@/auth/authGateway';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { claimLocalData, countLocalRecords } from '@/auth/claimLocalData';
