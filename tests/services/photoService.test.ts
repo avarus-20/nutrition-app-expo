@@ -1,5 +1,6 @@
 import { claimLocalData, wipeAccountData } from '@/auth/claimLocalData';
 import { targetSize } from '@/media/photoSize';
+import { dataEvents } from '@/services/events';
 import { MAX_PHOTOS_PER_MEAL, type PreparedPhoto } from '@/services/photoService';
 import { SyncEngine } from '@/sync/syncEngine';
 import { FakeFiles } from '../helpers/fakeFiles';
@@ -114,7 +115,11 @@ describe('PhotoService', () => {
     const remotePhoto = await b.photos.get(id);
     expect(remotePhoto?.local_uri).toBeNull();
     expect(await b.photos.ensureLocal(remotePhoto!, null)).toBeNull(); // signed out / offline: no download
+    const events: string[][] = [];
+    const unsubscribe = dataEvents.subscribe((topics) => { events.push([...topics]); });
     const uri = await b.photos.ensureLocal(remotePhoto!, (path) => remote.downloadFile(path));
+    unsubscribe();
+    expect(events).toContainEqual(['media_files']);
     expect(uri).toBe(`file:///media/${id}.jpg`);
     expect(new TextDecoder().decode(await b.files.readFileBytes(uri!))).toBe('camera://original');
     expect((await b.photos.get(id))?.local_uri).toBe(uri);
