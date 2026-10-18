@@ -57,7 +57,7 @@ supabase functions deploy transcribe
 
 Dashboard settings that are not in migrations:
 
-- **Auth → URL configuration**: Site URL = the web origin of that environment; redirect URLs: `nutritiontracker://` (native) and the web origin(s).
+- **Auth → URL configuration**: Site URL = the web origin of that environment; redirect URLs: `nutritiontracker://**` (native deep links, including `/auth/update-password`) and each environment's web origin with `/auth/update-password` (for example `https://app.example.com/auth/update-password`). Set the correct web Site URL and use the app's generated redirect URL. Test the exact link produced in that environment; do not add production redirects to a development project.
 - **Auth → Providers**: email enabled; minimum password length 8; enable email confirmation for production.
 - **Auth → Rate limits / CAPTCHA**: enable for production.
 - Storage: the `user-media` bucket and its policies are created by migration `20261007000003_private_media_storage.sql` — do not make it public.
@@ -155,3 +155,12 @@ Store submission (`eas submit`) is a manual release step — see [RELEASE.md](RE
 | database | PostgreSQL 16 service, `npm run test:db` (migrations, constraints, triggers, RLS) |
 
 CI never needs secrets: the web bundle is built in local-only mode.
+
+## Password recovery validation
+
+1. Configure Auth → URL Configuration with the exact origin and route for web, and the native `nutritiontracker` scheme. Use separate Supabase projects per environment.
+2. Request password reset from the sign-in screen and inspect that the email link redirects to `/auth/update-password` (web) or the native deep link; allow the Supabase client to establish the recovery session before typing a new password.
+3. Enter a new password (at least eight characters), save it, sign out, and confirm that only the new password works. Check expired/invalid tokens and deep-link handling in a real Android/iOS build as well as hosted HTTPS web.
+4. Never include access or refresh tokens in screenshots, logs, support tickets or issue comments. Deploy a tested build and validate mail delivery before advertising password recovery.
+
+GitHub CI uses the local-only backend configuration, so the real email delivery and native redirect flow **cannot** be marked validated by CI alone.
