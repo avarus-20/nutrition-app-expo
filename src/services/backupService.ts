@@ -1,17 +1,20 @@
 import { z } from 'zod';
 
 import { ENTITY_ORDER, MEDIA_ENTITIES, remoteColumns, type EntityName } from '@/database/schema';
+import { LOCAL_OWNER } from '@/domain/types';
 import type { SqlDatabase, SqlExecutor, SqlValue } from '@/database/types';
 import { enqueueChange, insertEntity, type Row } from '@/repositories/base';
+import { goalId } from '@/services/bodyService';
 import { REMOTE_SCHEMAS } from '@/sync/remoteSchemas';
 import { toCsv } from '@/utils/csv';
 import { compareIso, isoToLocalTime, nowIso } from '@/utils/dates';
 import { AppError, errorMessage, toAppError } from '@/utils/errors';
+import { deterministicId } from '@/utils/ids';
 import { dataEvents } from './events';
 import type { OwnerProvider } from './mealService';
 
 export const BACKUP_FORMAT = 'nutrition-tracker-backup';
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 
 /**
@@ -58,6 +61,8 @@ export interface BackupFile {
   version: number;
   exported_at: string;
   app_version: string | null;
+  /** Origin account UUID or 'local'; absent for legacy v1 files. */
+  source_owner: string | null;
   data: Record<BackupEntity, Row[]>;
 }
 
@@ -72,6 +77,7 @@ const envelopeSchema = z.object({
   version: z.number().int().positive(),
   exported_at: z.string(),
   app_version: z.string().nullable().optional(),
+  source_owner: z.string().min(1).nullable().optional(),
   data: z.record(z.string(), z.array(z.unknown())),
 });
 
@@ -110,6 +116,9 @@ export function parseBackup(text: string): BackupFile {
       },
     );
   }
+  if (envelope.data.version >= 2 && !envelope.data.source_owner) {
+    throw new AppError('invalid_import', 'Backup is missing its source owner');
+  }
   const data = {} as Record<BackupEntity, Row[]>;
   for (const entity of BACKUP_ENTITIES) {
     const rows = envelope.data.data[entity] ?? [];
@@ -133,6 +142,7 @@ export function parseBackup(text: string): BackupFile {
     version: envelope.data.version,
     exported_at: envelope.data.exported_at,
     app_version: envelope.data.app_version ?? null,
+    source_owner: envelope.data.version >= 2 ? envelope.data.source_owner ?? null : null,
     data,
   };
 }
@@ -159,6 +169,7 @@ export class BackupService {
       version: BACKUP_VERSION,
       exported_at: now,
       app_version: this.appVersion,
+      source_owner: ownerId,
       data,
     };
   }
@@ -225,9 +236,38 @@ export class BackupService {
     const result: RestoreResult = { inserted: 0, updated: 0, skipped: 0 };
     const changed = new Set<EntityName>();
     await this.db.transaction(async (tx) => {
+      // Remap every source UUID consistently before inserting dependent rows.
+      // Foreign account ids are globally unique in PostgreSQL, even under RLS.
+      // V1 did not record ownership, so signed-in imports are re-keyed safely.
+      const transfer = backup.source_owner !== ownerId &&
+        !(backup.source_owner === null && ownerId === LOCAL_OWNER);
+      const ids = new Map<string, string>();
       for (const entity of BACKUP_ENTITIES) {
         for (const row of backup.data[entity]) {
-          const outcome = await this.restoreRow(tx, entity, ownerId, row).catch((error: unknown) => {
+          const sourceId = String(row.id);
+          const existing = transfer
+            ? null
+            : await tx.first<{ user_id: string }>(`SELECT user_id FROM ${entity} WHERE id = ?`, [sourceId]);
+          if (transfer || (existing && existing.user_id !== ownerId)) {
+            const targetId = entity === 'nutrition_goals'
+              ? await goalId(ownerId, String(row.nutrient) as Parameters<typeof goalId>[1])
+              : await deterministicId('backup-transfer', `${ownerId}:${sourceId}`);
+            ids.set(sourceId, targetId);
+          }
+        }
+      }
+      for (const entity of BACKUP_ENTITIES) {
+        for (const row of backup.data[entity]) {
+          const mapped: Row = { ...row, id: ids.get(String(row.id)) ?? String(row.id) };
+          if (entity === 'favorite_foods' || entity === 'meal_items') {
+            if (typeof row.food_id === 'string') {
+              mapped.food_id = ids.get(row.food_id) ?? (transfer ? null : row.food_id);
+            }
+          }
+          if (entity === 'meal_items' && typeof row.meal_id === 'string') {
+            mapped.meal_id = ids.get(row.meal_id) ?? row.meal_id;
+          }
+          const outcome = await this.restoreRow(tx, entity, ownerId, mapped).catch((error: unknown) => {
             // A record violating a local constraint (e.g. an out-of-range value
             // from a hand-edited file) is skipped; anything else aborts the restore.
             if (/constraint/i.test(errorMessage(error))) return 'skipped' as const;

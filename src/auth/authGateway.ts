@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 import { AppError } from '@/utils/errors';
 
@@ -23,9 +24,11 @@ export interface AuthGateway {
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  updatePassword(password: string): Promise<void>;
+  acceptRecoveryLink(url: string): Promise<boolean>;
   /** Deletes the account and all server data (server-side function). */
   deleteAccount(): Promise<void>;
-  onChange(listener: (user: AuthUser | null) => void): () => void;
+  onChange(listener: (user: AuthUser | null, event: string) => void): () => void;
 }
 
 interface ErrorLike {
@@ -96,8 +99,34 @@ export class SupabaseAuthGateway implements AuthGateway {
   }
 
   async resetPassword(email: string): Promise<void> {
-    const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim());
+    // Both the website and the native deep link land on a password editor.
+    const redirectTo = `${Linking.createURL('/auth/update-password')}?type=recovery`;
+    const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
     if (error) throw mapAuthError(error);
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    if (password.length < 8) throw new AppError('auth_weak_password', 'Password is too short');
+    const { error } = await this.supabase.auth.updateUser({ password });
+    if (error) throw mapAuthError(error);
+  }
+
+  /**
+   * Native callbacks must exchange a PKCE auth code created by a recovery
+   * request on this SAME device. Never install caller-supplied session tokens:
+   * another app can invoke public custom URI schemes.
+   */
+  async acceptRecoveryLink(url: string): Promise<boolean> {
+    if (!url.includes('/auth/update-password?')) return false;
+    const params = new URLSearchParams(url.split('?')[1]?.split('#')[0] ?? '');
+    if (params.get('type') !== 'recovery') return false;
+    const code = params.get('code');
+    if (!code) throw new AppError('auth', 'Expected a PKCE recovery code');
+    // FI: Koodin vaihto vaatii aiemmin tähän laitteeseen tallennetun PKCE-varmenteen.
+    // RU: Обмен кода требует PKCE-верификатор, ранее сохранённый на этом устройстве.
+    const { error } = await this.supabase.auth.exchangeCodeForSession(code);
+    if (error) throw mapAuthError(error);
+    return true;
   }
 
   async deleteAccount(): Promise<void> {
@@ -109,10 +138,29 @@ export class SupabaseAuthGateway implements AuthGateway {
     await this.supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
   }
 
-  onChange(listener: (user: AuthUser | null) => void): () => void {
-    const { data } = this.supabase.auth.onAuthStateChange((_event, session) => listener(toUser(session?.user)));
+  onChange(listener: (user: AuthUser | null, event: string) => void): () => void {
+    const { data } = this.supabase.auth.onAuthStateChange((event, session) => listener(toUser(session?.user), event));
     return () => data.subscription.unsubscribe();
   }
+}
+
+/**
+ * Preserve a verified recovery grant across duplicate SIGNED_IN events for
+ * the same account; clear it on logout or account changes.
+ */
+export function nextRecoveryOwner(
+  currentOwner: string | null,
+  event: string,
+  userId: string | null,
+): string | null {
+  if (!userId || event === 'SIGNED_OUT') return null;
+  if (event === 'PASSWORD_RECOVERY') return userId;
+  return currentOwner === userId ? currentOwner : null;
+}
+
+/** A normal authenticated session must never unlock the recovery form. */
+export function hasVerifiedRecovery(status: string, recoveryReady: boolean): boolean {
+  return status === 'signedIn' && recoveryReady;
 }
 
 export function validateCredentials(email: string, password: string): Record<string, string> {

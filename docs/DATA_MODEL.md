@@ -23,14 +23,15 @@ Item `source`: `manual`, `food` (from the library), `recent`, `voice`, `photo_ai
 
 Every synchronized record has `id` (client-generated UUID), `user_id`, `created_at`, `updated_at` (last-write-wins clock), `deleted_at` (soft delete), `server_updated_at` and `version` (set by the server). See [OFFLINE_SYNC.md](OFFLINE_SYNC.md).
 
-## Backup format (JSON, version 1)
+## Backup format (JSON, version 2)
 
 Settings → *Backup and export* → *Export backup* (`src/services/backupService.ts`). Native platforms open the share sheet; the browser downloads the file.
 
 ```json
 {
   "format": "nutrition-tracker-backup",
-  "version": 1,
+  "version": 2,
+  "source_owner": "local",
   "exported_at": "2026-10-07T09:00:00.000Z",
   "app_version": "1.0.0",
   "data": {
@@ -46,20 +47,22 @@ Settings → *Backup and export* → *Export backup* (`src/services/backupServic
 ```
 
 - Contains every live (not deleted) record of the current owner, in dependency order.
-- Excluded: `user_id`, `deleted_at`, `server_updated_at`, `version` (account/device specific), photos and voice notes (binaries tied to device storage or the account's bucket), drafts, preferences.
+- A `source_owner` marker (`local` or the original Supabase user UUID) identifies the backup source for safe imports. This is account metadata, so **treat exported backups as private**.
+- Excluded from individual rows: `user_id`, `deleted_at`, `server_updated_at`, `version` (account/device specific), photos and voice notes (binaries tied to device storage or the account's bucket), drafts, preferences.
 - Format changes increase `version`. Older app versions refuse newer files (`unsupported_version`); newer app versions must keep reading every older version.
 
 ### Restore rules
 
 1. The whole file is validated before anything is written: format marker, version, and every record against the same schemas used for server rows (`src/sync/remoteSchemas.ts`). Unknown fields are ignored; any invalid record rejects the file.
 2. Duplicate ids inside the file collapse to the copy with the newest `updated_at`.
-3. Merge per record, in one transaction:
-   - unknown id → inserted for the current owner;
+3. When the backup comes from a different owner, map every imported UUID to a stable destination-specific UUID (including meals, foods, favorites, and linked items), and remap `meal_id` / `food_id` dependencies. A missing optional food link is cleared rather than pointing to foreign data. Same-owner backups keep their IDs, except on a direct ID collision with a foreign local row. Legacy v1 files lack owner metadata and are conservatively re-keyed for signed-in destinations; a v1 import can duplicate already-synchronized records on an empty new device, so prefer exporting a v2 backup when possible.
+4. Merge per record, in one transaction:
+   - unknown (possibly mapped) id → inserted for the current owner;
    - existing id → replaced only if the backup copy is newer (`updated_at`); a newer local edit or deletion wins;
    - goals and favorites are matched by their natural key (nutrient / food) as well, so a goal is never duplicated;
    - a meal item whose meal (or a favorite whose food) is neither local nor in the file is skipped, as is any record violating a local constraint.
-4. Restored changes go through the outbox, so a signed-in user's restore is synchronized.
-5. Restoring the same file again changes nothing ("0 new, 0 updated, N unchanged").
+5. Restored changes go through the outbox, so a signed-in user's restore is synchronized.
+6. Restoring the same file again changes nothing ("0 new, 0 updated, N unchanged").
 
 ## CSV export
 

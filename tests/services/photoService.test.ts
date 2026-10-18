@@ -1,5 +1,6 @@
 import { claimLocalData, wipeAccountData } from '@/auth/claimLocalData';
 import { targetSize } from '@/media/photoSize';
+import { dataEvents } from '@/services/events';
 import { MAX_PHOTOS_PER_MEAL, type PreparedPhoto } from '@/services/photoService';
 import { SyncEngine } from '@/sync/syncEngine';
 import { FakeFiles } from '../helpers/fakeFiles';
@@ -114,7 +115,11 @@ describe('PhotoService', () => {
     const remotePhoto = await b.photos.get(id);
     expect(remotePhoto?.local_uri).toBeNull();
     expect(await b.photos.ensureLocal(remotePhoto!, null)).toBeNull(); // signed out / offline: no download
+    const events: string[][] = [];
+    const unsubscribe = dataEvents.subscribe((topics) => { events.push([...topics]); });
     const uri = await b.photos.ensureLocal(remotePhoto!, (path) => remote.downloadFile(path));
+    unsubscribe();
+    expect(events).toContainEqual(['media_files']);
     expect(uri).toBe(`file:///media/${id}.jpg`);
     expect(new TextDecoder().decode(await b.files.readFileBytes(uri!))).toBe('camera://original');
     expect((await b.photos.get(id))?.local_uri).toBe(uri);
@@ -162,3 +167,32 @@ function remoteWithFiles(remote: FakeRemote, files: FakeFiles) {
     },
   };
 }
+
+describe('remote media download races', () => {
+  it('removes a downloaded file if its photo was deleted before caching it', async () => {
+    const db = await setupDb();
+    const s = servicesFor(db, { id: USER });
+    const mealId = await s.meals.ensureMeal({ date: DAY, mealType: 'lunch' });
+    const id = await s.photos.add(mealId, photo());
+    const original = await s.photos.get(id);
+    await s.files.deleteLocalFile(original!.local_uri!);
+    await db.run(
+      'UPDATE media_files SET local_uri = NULL, storage_path = ? WHERE id = ?',
+      [`${USER}/photo/${id}.jpg`, id],
+    );
+    const remotePhoto = await s.photos.get(id);
+    const write = s.files.writeFileBytes.bind(s.files);
+    s.files.writeFileBytes = async (name, bytes) => {
+      const uri = await write(name, bytes);
+      // FI: Poistetaan tietue ennen kuin latauksen tila tallentuu.
+      // RU: Удаляем запись до сохранения результата загрузки.
+      await s.photos.remove(id);
+      return uri;
+    };
+    expect(await s.photos.ensureLocal(
+      remotePhoto!,
+      async () => new TextEncoder().encode('remote image'),
+    )).toBeNull();
+    expect(s.files.files.size).toBe(0);
+  });
+});

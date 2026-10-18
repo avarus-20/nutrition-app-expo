@@ -67,3 +67,9 @@ Served with (single source `scripts/web-headers.mjs`, enforced by `scripts/build
 ## Reporting
 
 Please report vulnerabilities privately to the repository owner (GitHub security advisories) rather than in public issues.
+
+## Account transfer and recovery
+
+Version 2 backups contain `source_owner` (source account UUID or `local`), which must be considered private metadata. Restoring under a different account derives destination-scoped UUIDs and rewrites dependent food/meal references, preventing reuse of another account's globally keyed rows in PostgreSQL. Restore validation and RLS remain necessary; the owner marker is not proof of identity.
+
+Password reset uses Supabase PKCE (`flowType: 'pkce'`) and redirects to `/auth/update-password?type=recovery`. Native deep links accept only short-lived authorization `code` values; `exchangeCodeForSession` requires the PKCE verifier saved on the same device that initiated the reset. The app explicitly rejects custom-scheme URLs containing raw access/refresh tokens or a token hash, preventing injected sessions from claiming local nutrition data. On web, the Supabase client processes the PKCE callback and emits a `PASSWORD_RECOVERY` event. The password editor requires a verified recovery state rather than merely an authenticated session; after success it shows a confirmation screen. Configure redirect allow-lists, do not log recovery codes or tokens, and verify real hosted and native flows before release.

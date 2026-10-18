@@ -1,4 +1,5 @@
 import { textToDraft, transcribeVoiceNote } from '@/services/recognitionFlows';
+import { dataEvents } from '@/services/events';
 import { formatDuration } from '@/features/voice/duration';
 import type { RecognitionGateway } from '@/services/recognition';
 import { MAX_VOICE_NOTES_PER_MEAL, type RecordedAudio } from '@/services/voiceService';
@@ -40,6 +41,9 @@ describe('VoiceService', () => {
     s.files.persistFile = async (uri, name) => ({ ...(await persist(uri, name)), mimeType: 'audio/ogg;codecs=opus' });
     const id = await s.voice.add(mealId, audio({ mimeType: 'audio/webm' }));
     expect((await s.voice.get(id))?.mime_type).toBe('audio/ogg');
+    const clamped = await s.voice.add(mealId, audio({ durationMs: 185_000 }));
+    expect((await s.voice.get(clamped))?.duration_ms).toBe(180_000);
+
 
     s.files.persistFile = async (uri, name) => ({ ...(await persist(uri, name)), mimeType: 'video/mp4' });
     await expect(s.voice.add(mealId, audio())).rejects.toMatchObject({ code: 'validation' });
@@ -85,7 +89,11 @@ describe('VoiceService', () => {
     await new SyncEngine(dbB, remote, { userId: () => USER }).sync();
     const note = await b.voice.get(id);
     expect(note).toMatchObject({ transcript: 'two eggs and coffee', local_uri: null });
+    const events: string[][] = [];
+    const unsubscribe = dataEvents.subscribe((topics) => { events.push([...topics]); });
     const uri = await b.voice.ensureLocal(note!, (p) => remote.downloadFile(p));
+    unsubscribe();
+    expect(events).toContainEqual(['voice_notes']);
     expect(uri).toBe(`file:///media/${id}.m4a`);
   });
 });

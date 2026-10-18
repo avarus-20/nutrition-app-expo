@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { validateCredentials } from '@/auth/authGateway';
+import { hasVerifiedRecovery, validateCredentials } from '@/auth/authGateway';
 import { errorText } from '@/i18n';
 import { useI18n, useTheme } from '@/providers/PreferencesProvider';
 import { Button } from '@/ui/Button';
@@ -13,10 +13,10 @@ import { AppText } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
 import { toAppError } from '@/utils/errors';
 
-export type AuthMode = 'signIn' | 'signUp' | 'reset';
+export type AuthMode = 'signIn' | 'signUp' | 'reset' | 'update';
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
-  const { state, signIn, signUp, resetPassword } = useAuth();
+  const { state, recoveryReady, signIn, signUp, resetPassword, updatePassword } = useAuth();
   const { m } = useI18n();
   const { spacing } = useTheme();
   const [email, setEmail] = useState('');
@@ -25,7 +25,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [message, setMessage] = useState<{ tone: 'error' | 'success'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const title = mode === 'signIn' ? m.auth.signInTitle : mode === 'signUp' ? m.auth.signUpTitle : m.auth.resetTitle;
+  const title = mode === 'signIn' ? m.auth.signInTitle : mode === 'signUp' ? m.auth.signUpTitle : mode === 'reset' ? m.auth.resetTitle : m.auth.updateTitle;
 
   if (state.status === 'disabled') {
     return (
@@ -36,7 +36,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   }
 
   const submit = async () => {
-    const found = validateCredentials(email, mode === 'reset' ? 'xxxxxxxx' : password);
+    const found = mode === 'update'
+      ? (password.length >= 8 ? {} : { password: 'too_short' })
+      : validateCredentials(email, mode === 'reset' ? 'xxxxxxxx' : password);
     setErrors(found);
     setMessage(null);
     if (Object.keys(found).length > 0) return;
@@ -49,9 +51,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         const result = await signUp(email, password);
         if (result.needsConfirmation) setMessage({ tone: 'success', text: m.auth.confirmEmail });
         else goBack('/');
-      } else {
+      } else if (mode === 'reset') {
         await resetPassword(email);
         setMessage({ tone: 'success', text: m.auth.resetSent });
+      } else {
+        await updatePassword(password);
+        setPassword('');
+        setMessage({ tone: 'success', text: m.auth.passwordUpdated });
       }
     } catch (error) {
       setMessage({ tone: 'error', text: errorText(m, toAppError(error).code) });
@@ -60,10 +66,31 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     }
   };
 
+  // FI: Onnistunut salasanan vaihto näkyy, vaikka palautusoikeus on käytetty.
+  // RU: После смены пароля показываем успех, хотя разрешение восстановления уже погашено.
+  if (mode === 'update' && message?.tone === 'success') {
+    return (
+      <Screen title={title} back backHref="/auth/sign-in" maxWidth={480}>
+        <Card>
+          <Banner tone="success" message={message.text} />
+          <Button label={m.auth.haveAccount} onPress={() => router.replace('/auth/sign-in')} />
+        </Card>
+      </Screen>
+    );
+  }
+
+  if (mode === 'update' && !hasVerifiedRecovery(state.status, recoveryReady)) {
+    return (
+      <Screen title={title} back backHref="/auth/sign-in">
+        <Banner tone="info" message={state.status === 'loading' ? m.common.loading : m.auth.recoveryInvalid} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen title={title} back backHref="/settings" maxWidth={480}>
       <Card>
-        <TextField
+        {mode !== 'update' ? <TextField
           label={m.auth.email}
           value={email}
           onChangeText={setEmail}
@@ -74,16 +101,16 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           inputMode="email"
           testID="auth-email"
           returnKeyType="next"
-        />
+        /> : null}
         {mode !== 'reset' ? (
           <TextField
-            label={m.auth.password}
+            label={mode === 'update' ? m.auth.newPassword : m.auth.password}
             value={password}
             onChangeText={setPassword}
             error={errors.password ? m.auth.passwordTooShort : null}
             secureTextEntry
             autoCapitalize="none"
-            autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'}
+            autoComplete={mode === 'signUp' || mode === 'update' ? 'new-password' : 'current-password'}
             testID="auth-password"
             onSubmitEditing={submit}
             returnKeyType="go"
@@ -91,14 +118,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         ) : null}
         {message ? <Banner tone={message.tone} message={message.text} /> : null}
         <Button
-          label={mode === 'signIn' ? m.auth.signIn : mode === 'signUp' ? m.auth.signUp : m.auth.sendReset}
+          label={mode === 'signIn' ? m.auth.signIn : mode === 'signUp' ? m.auth.signUp : mode === 'reset' ? m.auth.sendReset : m.auth.savePassword}
           onPress={submit}
           loading={busy}
           testID="auth-submit"
         />
-        {mode !== 'reset' ? <AppText tone="muted" variant="small">{m.auth.localDataNote}</AppText> : null}
+        {mode === 'signIn' || mode === 'signUp' ? <AppText tone="muted" variant="small">{m.auth.localDataNote}</AppText> : null}
       </Card>
-      <View style={{ gap: spacing.sm, alignItems: 'flex-start' }}>
+      {mode !== 'update' ? <View style={{ gap: spacing.sm, alignItems: 'flex-start' }}>
         {mode === 'signIn' ? (
           <>
             <Button variant="ghost" label={m.auth.noAccount} onPress={() => router.replace('/auth/sign-up')} />
@@ -111,7 +138,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         <AppText variant="small" tone="muted">
           {m.auth.comingSoon}
         </AppText>
-      </View>
+      </View> : null}
     </Screen>
   );
 }
