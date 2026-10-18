@@ -79,30 +79,55 @@ describe('password recovery', () => {
     } as unknown as SupabaseClient);
     await gateway.resetPassword(' person@example.com ');
     expect(resetPasswordForEmail).toHaveBeenCalledWith('person@example.com', {
-      redirectTo: expect.stringContaining('/auth/update-password'),
+      redirectTo: expect.stringContaining('/auth/update-password?type=recovery'),
     });
     await gateway.updatePassword('new-very-safe-password');
     expect(updateUser).toHaveBeenCalledWith({ password: 'new-very-safe-password' });
     await expect(gateway.updatePassword('short')).rejects.toMatchObject({ code: 'auth_weak_password' });
   });
 
-  it('accepts only recovery deep links and exchanges tokens for a session', async () => {
+  it('only exchanges locally correlated PKCE recovery codes', async () => {
+    const exchangeCodeForSession = jest.fn().mockResolvedValue({ error: null });
     const setSession = jest.fn().mockResolvedValue({ error: null });
     const verifyOtp = jest.fn().mockResolvedValue({ error: null });
     const gateway = new SupabaseAuthGateway({
-      auth: { setSession, verifyOtp },
+      auth: { exchangeCodeForSession, setSession, verifyOtp },
     } as unknown as SupabaseClient);
     expect(await gateway.acceptRecoveryLink('nutritiontracker://auth/sign-in')).toBe(false);
     expect(await gateway.acceptRecoveryLink(
-      'nutritiontracker://auth/update-password#type=recovery&access_token=access&refresh_token=refresh',
+      'nutritiontracker://auth/update-password?type=recovery&code=valid-pkce-code',
     )).toBe(true);
-    expect(setSession).toHaveBeenCalledWith({ access_token: 'access', refresh_token: 'refresh' });
-    expect(await gateway.acceptRecoveryLink(
-      'nutritiontracker://auth/update-password?type=recovery&token_hash=abc',
-    )).toBe(true);
-    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: 'abc', type: 'recovery' });
+    expect(exchangeCodeForSession).toHaveBeenCalledWith('valid-pkce-code');
+
+    // FI: Hyökkääjän tarjoamia sessiotunnuksia ei hyväksytä.
+    // RU: Токены сессии из сторонней ссылки никогда не принимаются.
     await expect(gateway.acceptRecoveryLink(
-      'nutritiontracker://auth/update-password#type=recovery',
+      'nutritiontracker://auth/update-password?type=recovery#access_token=attacker&refresh_token=token',
+    )).rejects.toMatchObject({ code: 'auth' });
+    await expect(gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password?type=recovery&token_hash=abc',
+    )).rejects.toMatchObject({ code: 'auth' });
+    expect(setSession).not.toHaveBeenCalled();
+    expect(verifyOtp).not.toHaveBeenCalled();
+
+    expect(await gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password?type=signup&code=some-code',
+    )).toBe(false);
+    expect(await gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password?code=missing-type',
+    )).toBe(false);
+    expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not install a session if PKCE verification fails', async () => {
+    const exchangeCodeForSession = jest.fn().mockResolvedValue({
+      error: { code: 'flow_state_not_found', message: 'PKCE verifier not found' },
+    });
+    const gateway = new SupabaseAuthGateway({
+      auth: { exchangeCodeForSession },
+    } as unknown as SupabaseClient);
+    await expect(gateway.acceptRecoveryLink(
+      'nutritiontracker://auth/update-password?type=recovery&code=untrusted',
     )).rejects.toMatchObject({ code: 'auth' });
   });
 });
