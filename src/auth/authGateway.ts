@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 import { AppError } from '@/utils/errors';
 
@@ -23,6 +24,8 @@ export interface AuthGateway {
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  updatePassword(password: string): Promise<void>;
+  acceptRecoveryLink(url: string): Promise<boolean>;
   /** Deletes the account and all server data (server-side function). */
   deleteAccount(): Promise<void>;
   onChange(listener: (user: AuthUser | null) => void): () => void;
@@ -96,8 +99,40 @@ export class SupabaseAuthGateway implements AuthGateway {
   }
 
   async resetPassword(email: string): Promise<void> {
-    const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim());
+    // Both the website and the native deep link land on a password editor.
+    const redirectTo = Linking.createURL('/auth/update-password');
+    const { error } = await this.supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
     if (error) throw mapAuthError(error);
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    if (password.length < 8) throw new AppError('auth_weak_password', 'Password is too short');
+    const { error } = await this.supabase.auth.updateUser({ password });
+    if (error) throw mapAuthError(error);
+  }
+
+  /** Native recovery links carry session tokens in the URL fragment.
+   * Web recovery is handled by Supabase's detectSessionInUrl option.
+   */
+  async acceptRecoveryLink(url: string): Promise<boolean> {
+    const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1];
+    const params = new URLSearchParams(fragment ?? '');
+    if (params.get('type') !== 'recovery') return false;
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (access_token && refresh_token) {
+      const { error } = await this.supabase.auth.setSession({ access_token, refresh_token });
+      if (error) throw mapAuthError(error);
+    } else if (params.get('token_hash')) {
+      const { error } = await this.supabase.auth.verifyOtp({
+        token_hash: params.get('token_hash')!,
+        type: 'recovery',
+      });
+      if (error) throw mapAuthError(error);
+    } else {
+      throw new AppError('auth', 'Recovery link is incomplete');
+    }
+    return true;
   }
 
   async deleteAccount(): Promise<void> {
